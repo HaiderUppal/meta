@@ -1,0 +1,12 @@
+.DS_Store
+__pycache__/
+*.pyc
+cleaned_images/
+*_cleaned.*
+*_ghost.*
+.env
+node_modules/
+dist/
+build/
+.vscode/
+.idea/

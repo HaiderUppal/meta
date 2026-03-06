@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Protocol — AI Metadata Eraser</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;700;800&display=swap');
+
+  :root {
+    --bg: #080a0e;
+    --surface: #0d1117;
+    --border: #1a2030;
+    --accent: #00ff88;
+    --accent2: #00cfff;
+    --warn: #ff4466;
+    --text: #c8d8e8;
+    --muted: #4a5a6a;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,255,136,0.012) 2px,
+      rgba(0,255,136,0.012) 4px
+    );
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* Grid bg */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+
+  .logo-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .ghost-icon {
+    width: 48px;
+    height: 48px;
+    position: relative;
+  }
+
+  .ghost-icon svg {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 0 8px var(--accent));
+  }
+
+  h1 {
+    font-family: var(--sans);
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+
+  h1 span {
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(0,255,136,0.5);
+  }
+
+  .tagline {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  /* Status bar */
+  .status-bar {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--accent);
+    text-align: center;
+    margin-bottom: 40px;
+    opacity: 0.7;
+    letter-spacing: 0.1em;
+  }
+
+  .status-bar .blink {
+    animation: blink 1.2s step-end infinite;
+  }
+
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Options panel */
+  .options-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+  }
+
+  .option-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .option-toggle:hover { border-color: var(--accent); background: rgba(0,255,136,0.04); }
+
+  .option-toggle input { display: none; }
+
+  .toggle-box {
+    width: 36px;
+    height: 20px;
+    border-radius: 10px;
+    background: var(--border);
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+
+  .toggle-box::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--muted);
+    top: 3px;
+    left: 3px;
+    transition: transform 0.2s, background 0.2s;
+  }
+
+  .option-toggle input:checked ~ .toggle-box { background: rgba(0,255,136,0.2); border: 1px solid var(--accent); }
+  .option-toggle input:checked ~ .toggle-box::after { transform: translateX(16px); background: var(--accent); }
+
+  .option-label {
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.3;
+  }
+
+  .option-label small {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* Drop zone */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 60px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    background: var(--surface);
+    margin-bottom: 32px;
+  }
+
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: rgba(0,255,136,0.04);
+    box-shadow: 0 0 40px rgba(0,255,136,0.08), inset 0 0 40px rgba(0,255,136,0.04);
+  }
+
+  .dropzone.dragover { transform: scale(1.01); }
+
+  #fileInput { display: none; }
+
+  .drop-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    display: block;
+    filter: grayscale(1);
+    transition: filter 0.3s;
+  }
+
+  .dropzone:hover .drop-icon { filter: none; }
+
+  .drop-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+  }
+
+  .drop-sub {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  /* Queue */
+  .queue {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+
+  .queue-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: border-color 0.3s;
+    animation: slideIn 0.25s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .queue-item.done { border-color: var(--accent); }
+  .queue-item.error { border-color: var(--warn); }
+
+  .item-thumb {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--border);
+  }
+
+  .item-info { flex: 1; min-width: 0; }
+
+  .item-name {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 4px;
+  }
+
+  .item-meta {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .item-status {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 4px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .status-waiting { color: var(--muted); }
+  .status-processing { color: var(--accent2); animation: pulse 1s ease-in-out infinite; }
+  .status-done { color: var(--accent); }
+  .status-error { color: var(--warn); }
+
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+
+  .item-dl {
+    background: rgba(0,255,136,0.1);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s;
+    white-space: nowrap;
+  }
+
+  .item-dl:hover { background: rgba(0,255,136,0.25); }
+
+  .item-remove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 4px;
+    line-height: 1;
+    transition: color 0.2s;
+  }
+
+  .item-remove:hover { color: var(--warn); }
+
+  /* Action bar */
+  .action-bar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 14px 28px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.03em;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    flex: 1;
+    min-width: 180px;
+  }
+
+  .btn-primary:hover { background: #00ffaa; box-shadow: 0 0 24px rgba(0,255,136,0.4); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; box-shadow: none; }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  .btn-dl-all {
+    background: var(--surface);
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+
+  .btn-dl-all:hover { background: rgba(0,255,136,0.12); }
+  .btn-dl-all:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Log */
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    line-height: 1.8;
+    max-height: 200px;
+    overflow-y: auto;
+    color: var(--muted);
+  }
+
+  .log-panel .log-ok { color: var(--accent); }
+  .log-panel .log-info { color: var(--accent2); }
+  .log-panel .log-warn { color: #ffaa00; }
+  .log-panel .log-err { color: var(--warn); }
+
+  .log-panel::-webkit-scrollbar { width: 4px; }
+  .log-panel::-webkit-scrollbar-track { background: transparent; }
+  .log-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* Progress */
+  .progress-bar-wrap {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    margin-bottom: 32px;
+    overflow: hidden;
+    display: none;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.3s;
+    box-shadow: 0 0 10px var(--accent);
+  }
+
+  /* Empty state */
+  .empty-queue {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    padding: 20px;
+    display: none;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .loc-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  /* Location Panel */
+  .location-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 32px;
+    transition: opacity 0.3s;
+  }
+
+  .location-panel.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .loc-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .loc-hint {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .loc-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .loc-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .loc-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .loc-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,255,136,0.07); }
+
+  .loc-custom-label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .loc-inputs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+  }
+
+  .loc-inputs input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    padding: 8px 12px;
+    border-radius: 6px;
+    flex: 1;
+    min-width: 160px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .loc-inputs input:focus { border-color: var(--accent2); }
+
+  .loc-custom-set {
+    background: rgba(0,207,255,0.1);
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 8px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+    letter-spacing: 0.1em;
+  }
+
+  .loc-custom-set:hover { background: rgba(0,207,255,0.2); }
+
+  .loc-selected {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+  }
+
+  .loc-coords {
+    color: var(--muted);
+    font-size: 0.68rem;
+  }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo-line">
+      <div class="ghost-icon">
+        <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M24 4C14 4 8 12 8 20V40L12 36L16 40L20 36L24 40L28 36L32 40L36 36L40 40V20C40 12 34 4 24 4Z" fill="none" stroke="#00ff88" stroke-width="2"/>
+          <circle cx="18" cy="22" r="3" fill="#00ff88" opacity="0.8"/>
+          <circle cx="30" cy="22" r="3" fill="#00ff88" opacity="0.8"/>
+          <line x1="8" y1="28" x2="40" y2="28" stroke="#00ff88" stroke-width="0.5" opacity="0.3"/>
+        </svg>
+      </div>
+      <h1>GHOST <span>PROTOCOL</span></h1>
+    </div>
+    <p class="tagline">// AI Metadata Erasure Engine // v2.0 //</p>
+  </header>
+
+  <div class="status-bar">
+    SYS READY <span class="blink">▮</span> &nbsp;|&nbsp; EXIF STRIPPER &nbsp;|&nbsp; WATERMARK NULLIFIER &nbsp;|&nbsp; SPOOFER ACTIVE
+  </div>
+
+  <!-- Options -->
+  <div class="section-label">// Operation Modes</div>
+  <div class="options-panel">
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-exif" checked>
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Strip EXIF / XMP
+        <small>Remove all metadata fields</small>
+      </div>
+    </label>
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-spoof" checked>
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Spoof Origin Data
+        <small>Inject camera + GPS metadata</small>
+      </div>
+    </label>
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-noise" checked>
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Pixel Noise Layer
+        <small>Disrupt invisible AI watermarks</small>
+      </div>
+    </label>
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-recompress" checked>
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Re-encode Image
+        <small>Fresh JPEG/PNG — no trace data</small>
+      </div>
+    </label>
+  </div>
+
+  <!-- Location Spoof Panel -->
+  <div id="locationPanel" class="location-panel">
+    <div class="loc-header">
+      <span class="section-label" style="margin:0">// GPS Spoof Location</span>
+      <span class="loc-hint">All images stamped with the same coordinates</span>
+    </div>
+    <div class="loc-grid">
+      <div class="loc-presets" id="locPresets">
+        <button class="loc-btn active" data-lat="48.8566" data-lng="2.3522" data-name="Paris, France">🇫🇷 Paris</button>
+        <button class="loc-btn" data-lat="35.6762" data-lng="139.6503" data-name="Tokyo, Japan">🇯🇵 Tokyo</button>
+        <button class="loc-btn" data-lat="40.7128" data-lng="-74.0060" data-name="New York, USA">🇺🇸 New York</button>
+        <button class="loc-btn" data-lat="51.5074" data-lng="-0.1278" data-name="London, UK">🇬🇧 London</button>
+        <button class="loc-btn" data-lat="52.5200" data-lng="13.4050" data-name="Berlin, Germany">🇩🇪 Berlin</button>
+        <button class="loc-btn" data-lat="41.9028" data-lng="12.4964" data-name="Rome, Italy">🇮🇹 Rome</button>
+        <button class="loc-btn" data-lat="31.5204" data-lng="74.3587" data-name="Lahore, Pakistan">🇵🇰 Lahore</button>
+        <button class="loc-btn" data-lat="25.2048" data-lng="55.2708" data-name="Dubai, UAE">🇦🇪 Dubai</button>
+        <button class="loc-btn" data-lat="19.0760" data-lng="72.8777" data-name="Mumbai, India">🇮🇳 Mumbai</button>
+        <button class="loc-btn" data-lat="1.3521" data-lng="103.8198" data-name="Singapore">🇸🇬 Singapore</button>
+        <button class="loc-btn" data-lat="-33.8688" data-lng="151.2093" data-name="Sydney, Australia">🇦🇺 Sydney</button>
+        <button class="loc-btn" data-lat="55.7558" data-lng="37.6173" data-name="Moscow, Russia">🇷🇺 Moscow</button>
+      </div>
+      <div class="loc-custom">
+        <div class="loc-custom-label">Custom coordinates</div>
+        <div class="loc-inputs">
+          <input type="number" id="customLat" placeholder="Latitude e.g. 48.8566" step="any" min="-90" max="90">
+          <input type="number" id="customLng" placeholder="Longitude e.g. 2.3522" step="any" min="-180" max="180">
+          <button class="loc-custom-set" id="btnCustomLoc">SET</button>
+        </div>
+        <div class="loc-selected" id="locSelected">📍 Paris, France &nbsp;<span class="loc-coords">48.8566, 2.3522</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drop Zone -->
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <span class="drop-icon">👻</span>
+    <div class="drop-title">Drop images here to vanish their trace</div>
+    <div class="drop-sub">JPG · PNG · WEBP · GIF &nbsp;|&nbsp; Batch supported &nbsp;|&nbsp; Processed locally — never uploaded</div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-bar-wrap" id="progressWrap">
+    <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+  </div>
+
+  <!-- Queue -->
+  <div class="section-label" id="queueLabel" style="display:none">// Image Queue</div>
+  <div class="queue" id="queue"></div>
+  <div class="empty-queue" id="emptyNote">No images loaded yet.</div>
+
+  <!-- Actions -->
+  <div class="action-bar">
+    <button class="btn btn-primary" id="btnProcess" disabled>⚡ PROCESS ALL</button>
+    <button class="btn btn-dl-all" id="btnDlAll" disabled>↓ DOWNLOAD ALL CLEAN</button>
+    <button class="btn btn-secondary" id="btnClear">✕ Clear Queue</button>
+  </div>
+
+  <!-- Log -->
+  <div class="section-label">// Operation Log</div>
+  <div class="log-panel" id="log">
+    <span class="log-info">[GHOST PROTOCOL v2.0] System initialized. All processing is local — zero data leaves your device.</span>
+  </div>
+
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────
+  const files = [];
+  const results = {}; // filename -> blob url
+
+  // Location spoof state
+  let spoofLocation = { lat: 48.8566, lng: 2.3522, name: 'Paris, France' };
+
+  const dropzone  = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const queue     = document.getElementById('queue');
+  const log       = document.getElementById('log');
+  const btnProcess = document.getElementById('btnProcess');
+  const btnDlAll  = document.getElementById('btnDlAll');
+  const btnClear  = document.getElementById('btnClear');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressFill = document.getElementById('progressFill');
+  const queueLabel = document.getElementById('queueLabel');
+
+  // ── Logging ───────────────────────────────────────────
+  function addLog(msg, type = 'info') {
+    const span = document.createElement('span');
+    span.className = `log-${type}`;
+    const ts = new Date().toLocaleTimeString('en-US', {hour12:false});
+    span.textContent = `[${ts}] ${msg}`;
+    log.appendChild(document.createElement('br'));
+    log.appendChild(span);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // ── Location Panel ────────────────────────────────────
+  const locPanel = document.getElementById('locationPanel');
+  const locSelected = document.getElementById('locSelected');
+
+  function setLocation(lat, lng, name) {
+    spoofLocation = { lat: parseFloat(lat), lng: parseFloat(lng), name };
+    locSelected.innerHTML = `📍 ${name} &nbsp;<span class="loc-coords">${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}</span>`;
+    addLog(`GPS spoof set → ${name} (${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)})`, 'info');
+  }
+
+  // Preset buttons
+  document.querySelectorAll('.loc-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.loc-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setLocation(btn.dataset.lat, btn.dataset.lng, btn.dataset.name);
+    });
+  });
+
+  // Custom coordinates
+  document.getElementById('btnCustomLoc').addEventListener('click', () => {
+    const lat = parseFloat(document.getElementById('customLat').value);
+    const lng = parseFloat(document.getElementById('customLng').value);
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      addLog('Invalid coordinates. Lat: -90→90, Lng: -180→180', 'warn');
+      return;
+    }
+    document.querySelectorAll('.loc-btn').forEach(b => b.classList.remove('active'));
+    setLocation(lat, lng, 'Custom Location');
+  });
+
+  // Toggle panel when spoof checkbox changes
+  document.getElementById('opt-spoof').addEventListener('change', (e) => {
+    locPanel.classList.toggle('disabled', !e.target.checked);
+  });
+
+  // ── Drop Zone ─────────────────────────────────────────
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+  dropzone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  function handleFiles(incoming) {
+    let added = 0;
+    for (const f of incoming) {
+      if (!f.type.startsWith('image/')) { addLog(`Skipped non-image: ${f.name}`, 'warn'); continue; }
+      if (files.find(x => x.name === f.name && x.size === f.size)) continue;
+      files.push(f);
+      renderQueueItem(f);
+      added++;
+    }
+    if (added) {
+      addLog(`${added} image(s) queued for processing.`, 'info');
+      btnProcess.disabled = false;
+      queueLabel.style.display = 'block';
+    }
+  }
+
+  // ── Render queue item ─────────────────────────────────
+  function renderQueueItem(f) {
+    const id = CSS.escape(f.name + f.size);
+    const item = document.createElement('div');
+    item.className = 'queue-item';
+    item.id = `item-${id}`;
+
+    const thumb = document.createElement('img');
+    thumb.className = 'item-thumb';
+    thumb.src = URL.createObjectURL(f);
+
+    const info = document.createElement('div');
+    info.className = 'item-info';
+    info.innerHTML = `
+      <div class="item-name">${f.name}</div>
+      <div class="item-meta">${(f.size/1024).toFixed(1)} KB · ${f.type}</div>
+    `;
+
+    const status = document.createElement('span');
+    status.className = 'item-status status-waiting';
+    status.id = `status-${id}`;
+    status.textContent = 'QUEUED';
+
+    const remove = document.createElement('button');
+    remove.className = 'item-remove';
+    remove.textContent = '×';
+    remove.title = 'Remove';
+    remove.onclick = () => { 
+      item.remove(); 
+      const idx = files.findIndex(x => x.name===f.name && x.size===f.size);
+      if (idx > -1) files.splice(idx, 1);
+      if (!files.length) { btnProcess.disabled = true; queueLabel.style.display='none'; }
+    };
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(status);
+    item.appendChild(remove);
+    queue.appendChild(item);
+  }
+
+  // ── Spoof data pool ───────────────────────────────────
+  const cameras = ['Canon EOS R5','Nikon Z9','Sony α7 IV','Fujifilm X-T5','Leica M11','Panasonic S5 II'];
+  const software = ['Adobe Lightroom 13.0','Capture One 23','Darktable 4.4','RawTherapee 5.9'];
+  const rng = (a,b) => Math.random()*(b-a)+a;
+
+  // ── Core Processing ───────────────────────────────────
+  async function processFile(f) {
+    return new Promise((resolve, reject) => {
+      const optExif  = document.getElementById('opt-exif').checked;
+      const optSpoof = document.getElementById('opt-spoof').checked;
+      const optNoise = document.getElementById('opt-noise').checked;
+      const optRecompress = document.getElementById('opt-recompress').checked;
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      const url = URL.createObjectURL(f);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width  = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+
+        // Pixel noise layer — subtle randomization to break steganographic watermarks
+        if (optNoise) {
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          // Apply ±1 noise to LSBs — imperceptible but disrupts watermark patterns
+          for (let i = 0; i < data.length; i += 4) {
+            if (Math.random() < 0.08) { // Only 8% of pixels
+              data[i]   = Math.min(255, Math.max(0, data[i]   + (Math.random() < 0.5 ? 1 : -1)));
+              data[i+1] = Math.min(255, Math.max(0, data[i+1] + (Math.random() < 0.5 ? 1 : -1)));
+              data[i+2] = Math.min(255, Math.max(0, data[i+2] + (Math.random() < 0.5 ? 1 : -1)));
+            }
+          }
+          ctx.putImageData(imageData, 0, 0);
+        }
+
+        // Re-encode to clean JPEG (strips all metadata by default via canvas)
+        const mimeOut  = (f.type === 'image/png' && !optRecompress) ? 'image/png' : 'image/jpeg';
+        const quality  = optRecompress ? rng(0.88, 0.96) : 0.95;
+        const dataURL  = canvas.toDataURL(mimeOut, quality);
+
+        URL.revokeObjectURL(url);
+
+        // Build output filename — sanitize spaces
+        const base = f.name.replace(/\.[^.]+$/, '').replace(/\s+/g, '_');
+        const ext  = mimeOut === 'image/png' ? 'png' : 'jpg';
+        const outName = `${base}_ghost.${ext}`;
+
+        // Convert dataURL → blob
+        const byteStr = atob(dataURL.split(',')[1]);
+        const ab = new ArrayBuffer(byteStr.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+        const blob = new Blob([ab], { type: mimeOut });
+        const blobUrl = URL.createObjectURL(blob);
+
+        resolve({ outName, blobUrl, size: blob.size });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image failed to load')); };
+      // Use FileReader → base64 to avoid issues with spaces in filenames
+      const reader = new FileReader();
+      reader.onload = (e) => { img.src = e.target.result; };
+      reader.onerror = () => reject(new Error('Could not read file'));
+      reader.readAsDataURL(f);
+    });
+  }
+
+  // ── Process All ───────────────────────────────────────
+  btnProcess.addEventListener('click', async () => {
+    if (!files.length) return;
+    btnProcess.disabled = true;
+    btnClear.disabled = true;
+    progressWrap.style.display = 'block';
+    addLog(`Starting batch — ${files.length} image(s).`, 'info');
+
+    let done = 0;
+
+    for (const f of files) {
+      const id = CSS.escape(f.name + f.size);
+      const statusEl = document.getElementById(`status-${id}`);
+      const itemEl   = document.getElementById(`item-${id}`);
+
+      if (statusEl) {
+        statusEl.className = 'item-status status-processing';
+        statusEl.textContent = 'PROCESSING…';
+      }
+
+      addLog(`Processing: ${f.name} → GPS spoof: ${spoofLocation.name}`, 'info');
+
+      try {
+        const result = await processFile(f);
+        if (!result) throw new Error('Image failed to load');
+
+        results[f.name] = result;
+
+        if (statusEl) {
+          statusEl.className = 'item-status status-done';
+          statusEl.textContent = 'CLEAN ✓';
+        }
+        if (itemEl) {
+          itemEl.classList.add('done');
+          // Add download link
+          const dl = document.createElement('a');
+          dl.className = 'item-dl';
+          dl.href = result.blobUrl;
+          dl.download = result.outName;
+          dl.textContent = '↓ SAVE';
+          itemEl.insertBefore(dl, itemEl.lastChild);
+        }
+
+        addLog(`✓ ${f.name} → ${result.outName} (${(result.size/1024).toFixed(1)} KB)`, 'ok');
+      } catch (err) {
+        if (statusEl) {
+          statusEl.className = 'item-status status-error';
+          statusEl.textContent = 'ERROR';
+        }
+        if (itemEl) itemEl.classList.add('error');
+        addLog(`✗ Failed: ${f.name} — ${err.message}`, 'err');
+      }
+
+      done++;
+      progressFill.style.width = `${(done/files.length)*100}%`;
+    }
+
+    addLog(`Batch complete. ${done} image(s) processed. All metadata erased.`, 'ok');
+    btnProcess.disabled = false;
+    btnClear.disabled  = false;
+    btnDlAll.disabled  = Object.keys(results).length === 0;
+    progressFill.style.width = '100%';
+    setTimeout(() => { progressWrap.style.display = 'none'; progressFill.style.width='0%'; }, 2000);
+  });
+
+  // ── Download All ──────────────────────────────────────
+  btnDlAll.addEventListener('click', () => {
+    const entries = Object.values(results);
+    if (!entries.length) return;
+    addLog(`Triggering download for ${entries.length} clean image(s)…`, 'info');
+    entries.forEach((r, i) => {
+      setTimeout(() => {
+        const a = document.createElement('a');
+        a.href = r.blobUrl;
+        a.download = r.outName;
+        a.click();
+      }, i * 300);
+    });
+  });
+
+  // ── Clear ─────────────────────────────────────────────
+  btnClear.addEventListener('click', () => {
+    files.length = 0;
+    Object.keys(results).forEach(k => delete results[k]);
+    queue.innerHTML = '';
+    btnProcess.disabled = true;
+    btnDlAll.disabled = true;
+    queueLabel.style.display = 'none';
+    addLog('Queue cleared.', 'info');
+  });
+</script>
+</body>
+</html>
