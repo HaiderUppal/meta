@@ -614,19 +614,19 @@
       </div>
     </label>
     <label class="option-toggle">
-      <input type="checkbox" id="opt-noise" checked>
+      <input type="checkbox" id="opt-noise">
       <div class="toggle-box"></div>
       <div class="option-label">
         Pixel Noise Layer
-        <small>Disrupt invisible AI watermarks</small>
+        <small>Disrupts AI watermarks (re-encodes)</small>
       </div>
     </label>
     <label class="option-toggle">
-      <input type="checkbox" id="opt-recompress" checked>
+      <input type="checkbox" id="opt-recompress">
       <div class="toggle-box"></div>
       <div class="option-label">
         Re-encode Image
-        <small>Fresh JPEG/PNG — no trace data</small>
+        <small>⚠ Lossy — recompresses pixels</small>
       </div>
     </label>
   </div>
@@ -821,8 +821,8 @@
     remove.className = 'item-remove';
     remove.textContent = '×';
     remove.title = 'Remove';
-    remove.onclick = () => { 
-      item.remove(); 
+    remove.onclick = () => {
+      item.remove();
       const idx = files.findIndex(x => x.name===f.name && x.size===f.size);
       if (idx > -1) files.splice(idx, 1);
       if (!files.length) { btnProcess.disabled = true; queueLabel.style.display='none'; }
@@ -836,72 +836,436 @@
   }
 
   // ── Spoof data pool ───────────────────────────────────
-  const cameras = ['Canon EOS R5','Nikon Z9','Sony α7 IV','Fujifilm X-T5','Leica M11','Panasonic S5 II'];
+  const cameras = ['Canon EOS R5','Nikon Z9','Sony A7 IV','Fujifilm X-T5','Leica M11','Panasonic S5 II'];
+  const lenses  = ['24-70mm f/2.8','50mm f/1.4','85mm f/1.8','35mm f/1.4','70-200mm f/2.8','16-35mm f/4'];
   const software = ['Adobe Lightroom 13.0','Capture One 23','Darktable 4.4','RawTherapee 5.9'];
   const rng = (a,b) => Math.random()*(b-a)+a;
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
-  // ── Core Processing ───────────────────────────────────
-  async function processFile(f) {
-    return new Promise((resolve, reject) => {
-      const optExif  = document.getElementById('opt-exif').checked;
-      const optSpoof = document.getElementById('opt-spoof').checked;
-      const optNoise = document.getElementById('opt-noise').checked;
-      const optRecompress = document.getElementById('opt-recompress').checked;
+  // ═══════════════════════════════════════════════════════
+  // BINARY JPEG ENGINE — Lossless metadata strip + inject
+  // ═══════════════════════════════════════════════════════
 
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      const url = URL.createObjectURL(f);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width  = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
+  /**
+   * Strip all metadata segments from JPEG binary without re-encoding.
+   * Preserves every pixel byte — only removes APP1-APP15, COM markers.
+   * Returns Uint8Array of the cleaned JPEG.
+   */
+  function stripJpegMetadata(arrayBuffer) {
+    const data = new Uint8Array(arrayBuffer);
 
-        // Pixel noise layer — subtle randomization to break steganographic watermarks
-        if (optNoise) {
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-          // Apply ±1 noise to LSBs — imperceptible but disrupts watermark patterns
-          for (let i = 0; i < data.length; i += 4) {
-            if (Math.random() < 0.08) { // Only 8% of pixels
-              data[i]   = Math.min(255, Math.max(0, data[i]   + (Math.random() < 0.5 ? 1 : -1)));
-              data[i+1] = Math.min(255, Math.max(0, data[i+1] + (Math.random() < 0.5 ? 1 : -1)));
-              data[i+2] = Math.min(255, Math.max(0, data[i+2] + (Math.random() < 0.5 ? 1 : -1)));
-            }
-          }
-          ctx.putImageData(imageData, 0, 0);
+    // Verify JPEG SOI marker
+    if (data[0] !== 0xFF || data[1] !== 0xD8) return null;
+
+    const output = [new Uint8Array([0xFF, 0xD8])]; // Start with SOI
+    let i = 2;
+
+    // Metadata markers to strip
+    const stripMarkers = new Set([
+      0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7,   // APP1-APP7
+      0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF, // APP8-APP15
+      0xFE, // COM (comment)
+    ]);
+
+    while (i < data.length - 1) {
+      if (data[i] !== 0xFF) { i++; continue; }
+
+      const marker = data[i + 1];
+
+      // SOS (Start of Scan) — everything after is compressed image data, copy rest
+      if (marker === 0xDA) {
+        output.push(data.slice(i));
+        break;
+      }
+
+      // Standalone markers (no length field): RST0-RST7, SOI, EOI
+      if (marker === 0xD8 || marker === 0xD9 || (marker >= 0xD0 && marker <= 0xD7)) {
+        output.push(data.slice(i, i + 2));
+        i += 2;
+        continue;
+      }
+
+      // Segments with length field
+      if (i + 3 < data.length) {
+        const segLen = (data[i + 2] << 8) | data[i + 3];
+
+        if (stripMarkers.has(marker)) {
+          // Skip this metadata segment entirely
+          i += 2 + segLen;
+        } else {
+          // Keep this segment (DQT, DHT, SOF, APP0/JFIF, etc.)
+          output.push(data.slice(i, i + 2 + segLen));
+          i += 2 + segLen;
         }
+      } else {
+        break;
+      }
+    }
 
-        // Re-encode to clean JPEG (strips all metadata by default via canvas)
-        const mimeOut  = (f.type === 'image/png' && !optRecompress) ? 'image/png' : 'image/jpeg';
-        const quality  = optRecompress ? rng(0.88, 0.96) : 0.95;
-        const dataURL  = canvas.toDataURL(mimeOut, quality);
+    // Concatenate all kept chunks
+    const totalLen = output.reduce((s, a) => s + a.length, 0);
+    const result = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of output) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
 
-        URL.revokeObjectURL(url);
+  /**
+   * Strip metadata chunks from PNG binary without re-encoding.
+   * Removes tEXt, iTXt, zTXt, eXIf chunks. Keeps pixel data intact.
+   */
+  function stripPngMetadata(arrayBuffer) {
+    const data = new Uint8Array(arrayBuffer);
+    const view = new DataView(arrayBuffer);
 
-        // Build output filename — sanitize spaces
-        const base = f.name.replace(/\.[^.]+$/, '').replace(/\s+/g, '_');
-        const ext  = mimeOut === 'image/png' ? 'png' : 'jpg';
-        const outName = `${base}_ghost.${ext}`;
+    // Verify PNG signature
+    const pngSig = [137, 80, 78, 71, 13, 10, 26, 10];
+    for (let j = 0; j < 8; j++) {
+      if (data[j] !== pngSig[j]) return null;
+    }
 
-        // Convert dataURL → blob
-        const byteStr = atob(dataURL.split(',')[1]);
-        const ab = new ArrayBuffer(byteStr.length);
-        const ia = new Uint8Array(ab);
-        for (let i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
-        const blob = new Blob([ab], { type: mimeOut });
-        const blobUrl = URL.createObjectURL(blob);
+    const output = [data.slice(0, 8)]; // PNG signature
+    let i = 8;
 
-        resolve({ outName, blobUrl, size: blob.size });
-      };
-      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image failed to load')); };
-      // Use FileReader → base64 to avoid issues with spaces in filenames
-      const reader = new FileReader();
-      reader.onload = (e) => { img.src = e.target.result; };
-      reader.onerror = () => reject(new Error('Could not read file'));
-      reader.readAsDataURL(f);
-    });
+    // Metadata chunk types to strip
+    const stripTypes = new Set(['tEXt', 'iTXt', 'zTXt', 'eXIf']);
+
+    while (i + 8 <= data.length) {
+      const chunkLen = view.getUint32(i, false); // big-endian
+      const typeBytes = data.slice(i + 4, i + 8);
+      const chunkType = String.fromCharCode(...typeBytes);
+      const totalChunkSize = 4 + 4 + chunkLen + 4; // length + type + data + CRC
+
+      if (stripTypes.has(chunkType)) {
+        // Skip this metadata chunk
+      } else {
+        output.push(data.slice(i, i + totalChunkSize));
+      }
+
+      i += totalChunkSize;
+
+      // Stop after IEND
+      if (chunkType === 'IEND') break;
+    }
+
+    const totalSize = output.reduce((s, a) => s + a.length, 0);
+    const result = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const chunk of output) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
+
+  /**
+   * Build a complete EXIF APP1 segment with GPS coordinates + camera spoof data.
+   * Returns Uint8Array ready to inject after JPEG SOI marker.
+   */
+  function buildExifSegment(lat, lng, cameraMake, cameraModel, softwareName) {
+    const makeStr = cameraMake + '\0';
+    const modelStr = cameraModel + '\0';
+    const swStr = softwareName + '\0';
+    const now = new Date();
+    const dateStr = [
+      now.getFullYear(),
+      String(now.getMonth()+1).padStart(2,'0'),
+      String(now.getDate()).padStart(2,'0')
+    ].join(':') + ' ' + [
+      String(now.getHours()).padStart(2,'0'),
+      String(now.getMinutes()).padStart(2,'0'),
+      String(now.getSeconds()).padStart(2,'0')
+    ].join(':') + '\0'; // 20 bytes: "YYYY:MM:DD HH:MM:SS\0"
+
+    // ── Layout calculation (all offsets relative to TIFF header start) ──
+    const ifd0Count = 5; // Make, Model, Software, DateTime, GPSInfoPointer
+    const ifd0Start = 8; // right after 8-byte TIFF header
+    const ifd0Size = 2 + (ifd0Count * 12) + 4; // count + entries + next_ifd
+    let dataPtr = ifd0Start + ifd0Size;
+
+    // Align helper
+    const align2 = (n) => (n % 2) ? n + 1 : n;
+
+    const makeOff = dataPtr; dataPtr = align2(dataPtr + makeStr.length);
+    const modelOff = dataPtr; dataPtr = align2(dataPtr + modelStr.length);
+    const swOff = dataPtr; dataPtr = align2(dataPtr + swStr.length);
+    const dateOff = dataPtr; dataPtr = align2(dataPtr + dateStr.length);
+
+    // GPS IFD
+    const gpsIFDStart = dataPtr;
+    const gpsCount = 5; // VersionID, LatRef, Lat, LngRef, Lng
+    const gpsIFDSize = 2 + (gpsCount * 12) + 4;
+    const gpsDataStart = gpsIFDStart + gpsIFDSize;
+    const latDataOff = gpsDataStart;
+    const lngDataOff = gpsDataStart + 24; // 3 rationals × 8 bytes
+    const totalTiffSize = gpsDataStart + 48;
+
+    // ── Build buffer ──
+    const buf = new ArrayBuffer(totalTiffSize);
+    const view = new DataView(buf);
+    const bytes = new Uint8Array(buf);
+
+    // TIFF header — little-endian
+    bytes[0] = 0x49; bytes[1] = 0x49; // "II"
+    view.setUint16(2, 42, true);       // magic
+    view.setUint32(4, ifd0Start, true); // offset to IFD0
+
+    // ── IFD0 ──
+    let pos = ifd0Start;
+    view.setUint16(pos, ifd0Count, true); pos += 2;
+
+    function writeEntry(tag, type, count, value) {
+      view.setUint16(pos, tag, true); pos += 2;
+      view.setUint16(pos, type, true); pos += 2;
+      view.setUint32(pos, count, true); pos += 4;
+      view.setUint32(pos, value, true); pos += 4;
+    }
+
+    // Type constants: 2=ASCII, 4=LONG
+    writeEntry(0x010F, 2, makeStr.length, makeOff);    // Make
+    writeEntry(0x0110, 2, modelStr.length, modelOff);   // Model
+    writeEntry(0x0131, 2, swStr.length, swOff);         // Software
+    writeEntry(0x0132, 2, dateStr.length, dateOff);     // DateTime
+    writeEntry(0x8825, 4, 1, gpsIFDStart);              // GPSInfoIFDPointer
+
+    view.setUint32(pos, 0, true); // Next IFD offset = 0 (none)
+
+    // ── Write string data ──
+    function writeStr(offset, str) {
+      for (let k = 0; k < str.length; k++) bytes[offset + k] = str.charCodeAt(k);
+    }
+    writeStr(makeOff, makeStr);
+    writeStr(modelOff, modelStr);
+    writeStr(swOff, swStr);
+    writeStr(dateOff, dateStr);
+
+    // ── GPS IFD ──
+    pos = gpsIFDStart;
+    view.setUint16(pos, gpsCount, true); pos += 2;
+
+    // GPSVersionID (tag 0x0000) — 4 bytes, fits inline
+    view.setUint16(pos, 0x0000, true); pos += 2; // tag
+    view.setUint16(pos, 1, true); pos += 2;      // type BYTE
+    view.setUint32(pos, 4, true); pos += 4;      // count
+    bytes[pos] = 2; bytes[pos+1] = 3; bytes[pos+2] = 0; bytes[pos+3] = 0;
+    pos += 4;
+
+    // GPSLatitudeRef (tag 0x0001) — "N\0" or "S\0", fits inline
+    const latRef = lat >= 0 ? 'N' : 'S';
+    view.setUint16(pos, 0x0001, true); pos += 2;
+    view.setUint16(pos, 2, true); pos += 2; // ASCII
+    view.setUint32(pos, 2, true); pos += 4; // count = 2
+    bytes[pos] = latRef.charCodeAt(0); bytes[pos+1] = 0;
+    bytes[pos+2] = 0; bytes[pos+3] = 0;
+    pos += 4;
+
+    // GPSLatitude (tag 0x0002) — 3 RATIONALs, stored at offset
+    view.setUint16(pos, 0x0002, true); pos += 2;
+    view.setUint16(pos, 5, true); pos += 2; // RATIONAL
+    view.setUint32(pos, 3, true); pos += 4; // count = 3
+    view.setUint32(pos, latDataOff, true); pos += 4;
+
+    // GPSLongitudeRef (tag 0x0003) — "E\0" or "W\0"
+    const lngRef = lng >= 0 ? 'E' : 'W';
+    view.setUint16(pos, 0x0003, true); pos += 2;
+    view.setUint16(pos, 2, true); pos += 2;
+    view.setUint32(pos, 2, true); pos += 4;
+    bytes[pos] = lngRef.charCodeAt(0); bytes[pos+1] = 0;
+    bytes[pos+2] = 0; bytes[pos+3] = 0;
+    pos += 4;
+
+    // GPSLongitude (tag 0x0004) — 3 RATIONALs, stored at offset
+    view.setUint16(pos, 0x0004, true); pos += 2;
+    view.setUint16(pos, 5, true); pos += 2;
+    view.setUint32(pos, 3, true); pos += 4;
+    view.setUint32(pos, lngDataOff, true); pos += 4;
+
+    view.setUint32(pos, 0, true); // Next IFD = 0
+
+    // ── Write GPS DMS rational data ──
+    function writeDMS(offset, decimal) {
+      const abs = Math.abs(decimal);
+      const d = Math.floor(abs);
+      const mFloat = (abs - d) * 60;
+      const m = Math.floor(mFloat);
+      const s = (mFloat - m) * 60;
+      const sNum = Math.round(s * 10000);
+      view.setUint32(offset,      d, true);     view.setUint32(offset + 4,  1, true);
+      view.setUint32(offset + 8,  m, true);     view.setUint32(offset + 12, 1, true);
+      view.setUint32(offset + 16, sNum, true);  view.setUint32(offset + 20, 10000, true);
+    }
+    writeDMS(latDataOff, lat);
+    writeDMS(lngDataOff, lng);
+
+    // ── Wrap as APP1 segment ──
+    const exifIdent = new Uint8Array([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]); // "Exif\0\0"
+    const payload = new Uint8Array(6 + totalTiffSize);
+    payload.set(exifIdent, 0);
+    payload.set(new Uint8Array(buf), 6);
+
+    const app1Len = payload.length + 2; // +2 for the length field itself
+    const segment = new Uint8Array(2 + 2 + payload.length);
+    segment[0] = 0xFF; segment[1] = 0xE1; // APP1 marker
+    segment[2] = (app1Len >> 8) & 0xFF;
+    segment[3] = app1Len & 0xFF;
+    segment.set(payload, 4);
+
+    return segment;
+  }
+
+  /**
+   * Inject an EXIF APP1 segment into a clean JPEG (after SOI, before first segment).
+   */
+  function injectExifIntoJpeg(jpegBytes, exifSegment) {
+    // Insert after SOI (FF D8) = first 2 bytes
+    const result = new Uint8Array(jpegBytes.length + exifSegment.length);
+    result.set(jpegBytes.slice(0, 2), 0);           // SOI
+    result.set(exifSegment, 2);                       // New EXIF APP1
+    result.set(jpegBytes.slice(2), 2 + exifSegment.length); // Rest of JPEG
+    return result;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // CORE PROCESSING — Routes lossless vs lossy path
+  // ═══════════════════════════════════════════════════════
+
+  async function processFile(f) {
+    const optExif  = document.getElementById('opt-exif').checked;
+    const optSpoof = document.getElementById('opt-spoof').checked;
+    const optNoise = document.getElementById('opt-noise').checked;
+    const optRecompress = document.getElementById('opt-recompress').checked;
+
+    const isJPEG = (f.type === 'image/jpeg' || f.type === 'image/jpg');
+    const isPNG  = (f.type === 'image/png');
+
+    // Determine path: LOSSLESS (binary strip) vs LOSSY (canvas re-encode)
+    const needCanvas = optNoise || optRecompress;
+    const canBinaryStrip = (isJPEG || isPNG) && !needCanvas;
+
+    if (canBinaryStrip) {
+      // ══ LOSSLESS PATH — zero quality loss ══
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const arrayBuf = e.target.result;
+            let cleaned;
+
+            if (isJPEG) {
+              cleaned = optExif ? stripJpegMetadata(arrayBuf) : new Uint8Array(arrayBuf);
+              if (!cleaned) throw new Error('Invalid JPEG structure');
+
+              // Inject spoofed EXIF with real GPS coordinates
+              if (optSpoof) {
+                const cam = pick(cameras);
+                const sw  = pick(software);
+                const make = cam.split(' ')[0]; // "Canon", "Nikon", etc.
+                const exif = buildExifSegment(
+                  spoofLocation.lat, spoofLocation.lng,
+                  make, cam, sw
+                );
+                cleaned = injectExifIntoJpeg(cleaned, exif);
+                addLog(`  EXIF injected → ${cam} | ${sw} | GPS: ${spoofLocation.lat.toFixed(4)}, ${spoofLocation.lng.toFixed(4)}`, 'ok');
+              }
+            } else if (isPNG) {
+              cleaned = optExif ? stripPngMetadata(arrayBuf) : new Uint8Array(arrayBuf);
+              if (!cleaned) throw new Error('Invalid PNG structure');
+            }
+
+            const base = f.name.replace(/\.[^.]+$/, '').replace(/\s+/g, '_');
+            const ext  = isJPEG ? 'jpg' : 'png';
+            const mime = isJPEG ? 'image/jpeg' : 'image/png';
+            const outName = `${base}_ghost.${ext}`;
+            const blob = new Blob([cleaned], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+
+            addLog(`  LOSSLESS — pixel data preserved, ${(f.size/1024).toFixed(1)} KB → ${(blob.size/1024).toFixed(1)} KB`, 'info');
+
+            resolve({ outName, blobUrl, size: blob.size });
+          } catch (err) {
+            reject(err);
+          }
+        };
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsArrayBuffer(f);
+      });
+    } else {
+      // ══ LOSSY PATH — canvas re-encode (noise or recompress requested) ══
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width  = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+
+              // Pixel noise layer
+              if (optNoise) {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const px = imageData.data;
+                for (let p = 0; p < px.length; p += 4) {
+                  if (Math.random() < 0.08) {
+                    px[p]   = Math.min(255, Math.max(0, px[p]   + (Math.random() < 0.5 ? 1 : -1)));
+                    px[p+1] = Math.min(255, Math.max(0, px[p+1] + (Math.random() < 0.5 ? 1 : -1)));
+                    px[p+2] = Math.min(255, Math.max(0, px[p+2] + (Math.random() < 0.5 ? 1 : -1)));
+                  }
+                }
+                ctx.putImageData(imageData, 0, 0);
+              }
+
+              // Re-encode via canvas
+              const mimeOut = (isPNG && !optRecompress) ? 'image/png' : 'image/jpeg';
+              const quality = optRecompress ? rng(0.88, 0.96) : 0.95;
+              const dataURL = canvas.toDataURL(mimeOut, quality);
+
+              // Convert dataURL to ArrayBuffer
+              const byteStr = atob(dataURL.split(',')[1]);
+              const ab = new ArrayBuffer(byteStr.length);
+              const ia = new Uint8Array(ab);
+              for (let j = 0; j < byteStr.length; j++) ia[j] = byteStr.charCodeAt(j);
+
+              let finalBytes = ia;
+
+              // Inject EXIF+GPS into re-encoded JPEG
+              if (optSpoof && mimeOut === 'image/jpeg') {
+                const cam = pick(cameras);
+                const sw  = pick(software);
+                const make = cam.split(' ')[0];
+                const exif = buildExifSegment(
+                  spoofLocation.lat, spoofLocation.lng,
+                  make, cam, sw
+                );
+                finalBytes = injectExifIntoJpeg(ia, exif);
+                addLog(`  EXIF injected → ${cam} | ${sw} | GPS: ${spoofLocation.lat.toFixed(4)}, ${spoofLocation.lng.toFixed(4)}`, 'ok');
+              }
+
+              const base = f.name.replace(/\.[^.]+$/, '').replace(/\s+/g, '_');
+              const ext  = mimeOut === 'image/png' ? 'png' : 'jpg';
+              const outName = `${base}_ghost.${ext}`;
+              const blob = new Blob([finalBytes], { type: mimeOut });
+              const blobUrl = URL.createObjectURL(blob);
+
+              addLog(`  RE-ENCODED — canvas path used (noise: ${optNoise}, recompress: ${optRecompress})`, 'warn');
+
+              resolve({ outName, blobUrl, size: blob.size });
+            } catch (err) {
+              reject(err);
+            }
+          };
+          img.onerror = () => reject(new Error('Image failed to load'));
+          img.src = re.target.result;
+        };
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(f);
+      });
+    }
   }
 
   // ── Process All ───────────────────────────────────────
@@ -910,7 +1274,11 @@
     btnProcess.disabled = true;
     btnClear.disabled = true;
     progressWrap.style.display = 'block';
-    addLog(`Starting batch — ${files.length} image(s).`, 'info');
+
+    const optNoise = document.getElementById('opt-noise').checked;
+    const optRecompress = document.getElementById('opt-recompress').checked;
+    const mode = (!optNoise && !optRecompress) ? 'LOSSLESS BINARY' : 'CANVAS RE-ENCODE';
+    addLog(`Starting batch — ${files.length} image(s) — mode: ${mode}`, 'info');
 
     let done = 0;
 
@@ -924,11 +1292,11 @@
         statusEl.textContent = 'PROCESSING…';
       }
 
-      addLog(`Processing: ${f.name} → GPS spoof: ${spoofLocation.name}`, 'info');
+      addLog(`Processing: ${f.name}`, 'info');
 
       try {
         const result = await processFile(f);
-        if (!result) throw new Error('Image failed to load');
+        if (!result) throw new Error('Processing returned no result');
 
         results[f.name] = result;
 
@@ -938,7 +1306,6 @@
         }
         if (itemEl) {
           itemEl.classList.add('done');
-          // Add download link
           const dl = document.createElement('a');
           dl.className = 'item-dl';
           dl.href = result.blobUrl;
@@ -961,7 +1328,7 @@
       progressFill.style.width = `${(done/files.length)*100}%`;
     }
 
-    addLog(`Batch complete. ${done} image(s) processed. All metadata erased.`, 'ok');
+    addLog(`Batch complete. ${done} image(s) processed.`, 'ok');
     btnProcess.disabled = false;
     btnClear.disabled  = false;
     btnDlAll.disabled  = Object.keys(results).length === 0;
