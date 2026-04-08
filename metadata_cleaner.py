@@ -98,35 +98,26 @@ AI_VERSIONS = {
 
 # Location profiles — GPS coords with slight random jitter applied at runtime
 LOCATION_PROFILES = {
-    "sf": {
-        "label": "San Francisco, CA",
-        "lat": 37.7749,
-        "lng": -122.4194,
-        "alt": 16.0,          # meters above sea level
-        "tz_offset": "-08:00", # PST
-        "tz_offset_summer": "-07:00", # PDT
-        "jitter": 0.012,      # ~1.3 km random scatter
+    "paris": {
+        "label": "Paris, France",
+        "lat": 48.8566,
+        "lng": 2.3522,
+        "alt": 35.0,
+        "tz_offset": "+01:00",
+        "tz_offset_summer": "+02:00",
+        "jitter": 0.012,
     },
-    "la": {
-        "label": "Los Angeles, CA",
-        "lat": 34.0522,
-        "lng": -118.2437,
-        "alt": 71.0,
-        "tz_offset": "-08:00",
-        "tz_offset_summer": "-07:00",
-        "jitter": 0.015,
-    },
-    "london": {
-        "label": "London, UK",
-        "lat": 51.5074,
-        "lng": -0.1278,
-        "alt": 11.0,
-        "tz_offset": "+00:00", # GMT
-        "tz_offset_summer": "+01:00", # BST
-        "jitter": 0.010,
+    "tokyo": {
+        "label": "Tokyo, Japan",
+        "lat": 35.6762,
+        "lng": 139.6503,
+        "alt": 40.0,
+        "tz_offset": "+09:00",
+        "tz_offset_summer": "+09:00",
+        "jitter": 0.013,
     },
     "nyc": {
-        "label": "New York, NY",
+        "label": "New York, USA",
         "lat": 40.7128,
         "lng": -74.0060,
         "alt": 10.0,
@@ -134,8 +125,17 @@ LOCATION_PROFILES = {
         "tz_offset_summer": "-04:00",
         "jitter": 0.012,
     },
+    "london": {
+        "label": "London, UK",
+        "lat": 51.5074,
+        "lng": -0.1278,
+        "alt": 11.0,
+        "tz_offset": "+00:00",
+        "tz_offset_summer": "+01:00",
+        "jitter": 0.010,
+    },
     "berlin": {
-        "label": "Berlin, DE",
+        "label": "Berlin, Germany",
         "lat": 52.5200,
         "lng": 13.4050,
         "alt": 34.0,
@@ -143,14 +143,68 @@ LOCATION_PROFILES = {
         "tz_offset_summer": "+02:00",
         "jitter": 0.010,
     },
-    "tokyo": {
-        "label": "Tokyo, JP",
-        "lat": 35.6762,
-        "lng": 139.6503,
-        "alt": 40.0,
-        "tz_offset": "+09:00",
-        "tz_offset_summer": "+09:00",  # Japan doesn't observe DST
+    "rome": {
+        "label": "Rome, Italy",
+        "lat": 41.9028,
+        "lng": 12.4964,
+        "alt": 21.0,
+        "tz_offset": "+01:00",
+        "tz_offset_summer": "+02:00",
+        "jitter": 0.011,
+    },
+    "lahore": {
+        "label": "Lahore, Pakistan",
+        "lat": 31.5204,
+        "lng": 74.3587,
+        "alt": 217.0,
+        "tz_offset": "+05:00",
+        "tz_offset_summer": "+05:00",
+        "jitter": 0.012,
+    },
+    "dubai": {
+        "label": "Dubai, UAE",
+        "lat": 25.2048,
+        "lng": 55.2708,
+        "alt": 5.0,
+        "tz_offset": "+04:00",
+        "tz_offset_summer": "+04:00",
         "jitter": 0.013,
+    },
+    "mumbai": {
+        "label": "Mumbai, India",
+        "lat": 19.0760,
+        "lng": 72.8777,
+        "alt": 14.0,
+        "tz_offset": "+05:30",
+        "tz_offset_summer": "+05:30",
+        "jitter": 0.012,
+    },
+    "singapore": {
+        "label": "Singapore",
+        "lat": 1.3521,
+        "lng": 103.8198,
+        "alt": 15.0,
+        "tz_offset": "+08:00",
+        "tz_offset_summer": "+08:00",
+        "jitter": 0.010,
+    },
+    "sydney": {
+        "label": "Sydney, Australia",
+        "lat": -33.8688,
+        "lng": 151.2093,
+        "alt": 58.0,
+        "tz_offset": "+11:00",
+        "tz_offset_summer": "+10:00",
+        "jitter": 0.012,
+    },
+    "moscow": {
+        "label": "Moscow, Russia",
+        "lat": 55.7558,
+        "lng": 37.6173,
+        "alt": 156.0,
+        "tz_offset": "+03:00",
+        "tz_offset_summer": "+03:00",
+        "jitter": 0.011,
     },
 }
 
@@ -581,7 +635,7 @@ class MetadataCleaner:
 
         # Add standard Adobe-style text chunks
         meta.add_text("Software", self.config["creator"])
-        meta.add_text("Creation Time", self.fake_date.strftime("%Y-%m-%dT%H:%M:%S+05:00"))
+        meta.add_text("Creation Time", self.fake_date.strftime(f"%Y-%m-%dT%H:%M:%S{self.tz_offset}"))
 
         # Embed XMP as iTXt chunk
         xmp_data = self._build_illustrator_xmp()
@@ -708,7 +762,7 @@ Examples:
         "--location",
         choices=list(LOCATION_PROFILES.keys()),
         default=None,
-        help="Spoof GPS location (sf, la, london, nyc, berlin, tokyo)",
+        help="Spoof GPS location (paris, tokyo, nyc, london, berlin, rome, lahore, dubai, mumbai, singapore, sydney, moscow)",
     )
     parser.add_argument(
         "--verify-after",

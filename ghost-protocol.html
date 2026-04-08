@@ -570,6 +570,65 @@
     font-size: 0.68rem;
   }
 
+  /* Camera Panel */
+  .camera-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 32px;
+    transition: opacity 0.3s;
+  }
+
+  .camera-panel.disabled {
+    opacity: 0.35;
+    pointer-events: none;
+  }
+
+  .cam-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .cam-hint {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+
+  .cam-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .cam-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .cam-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+  .cam-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,255,136,0.07); }
+
+  .cam-selected {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+    margin-top: 10px;
+  }
+
 </style>
 </head>
 <body>
@@ -664,6 +723,29 @@
     </div>
   </div>
 
+  <!-- Camera Spoof Panel -->
+  <div id="cameraPanel" class="camera-panel">
+    <div class="cam-header">
+      <span class="section-label" style="margin:0">// Camera Make &amp; Model</span>
+      <span class="cam-hint">Select a camera or let Ghost pick randomly</span>
+    </div>
+    <div class="cam-presets" id="camPresets">
+      <button class="cam-btn active" data-make="random" data-model="random">🎲 Random</button>
+      <button class="cam-btn" data-make="Canon" data-model="Canon EOS R5">Canon EOS R5</button>
+      <button class="cam-btn" data-make="Nikon" data-model="Nikon Z9">Nikon Z9</button>
+      <button class="cam-btn" data-make="Sony" data-model="Sony A7 IV">Sony A7 IV</button>
+      <button class="cam-btn" data-make="Fujifilm" data-model="Fujifilm X-T5">Fujifilm X-T5</button>
+      <button class="cam-btn" data-make="Leica" data-model="Leica M11">Leica M11</button>
+      <button class="cam-btn" data-make="Panasonic" data-model="Panasonic S5 II">Panasonic S5 II</button>
+      <button class="cam-btn" data-make="GoPro" data-model="GoPro HERO12 Black">GoPro HERO12</button>
+      <button class="cam-btn" data-make="Apple" data-model="iPhone 15 Pro Max">iPhone 15 Pro Max</button>
+      <button class="cam-btn" data-make="Samsung" data-model="Samsung Galaxy S24 Ultra">Galaxy S24 Ultra</button>
+      <button class="cam-btn" data-make="Hasselblad" data-model="Hasselblad X2D 100C">Hasselblad X2D</button>
+      <button class="cam-btn" data-make="DJI" data-model="DJI Mavic 3 Pro">DJI Mavic 3 Pro</button>
+    </div>
+    <div class="cam-selected" id="camSelected">🎲 Random — a different camera for each image</div>
+  </div>
+
   <!-- Drop Zone -->
   <div class="dropzone" id="dropzone">
     <input type="file" id="fileInput" accept="image/*" multiple>
@@ -704,6 +786,9 @@
 
   // Location spoof state
   let spoofLocation = { lat: 48.8566, lng: 2.3522, name: 'Paris, France' };
+
+  // Camera spoof state — null means random
+  let spoofCamera = null;
 
   const dropzone  = document.getElementById('dropzone');
   const fileInput = document.getElementById('fileInput');
@@ -758,9 +843,28 @@
     setLocation(lat, lng, 'Custom Location');
   });
 
-  // Toggle panel when spoof checkbox changes
+  // ── Camera Panel ────────────────────────────────────
+  const camPanel = document.getElementById('cameraPanel');
+  const camSelected = document.getElementById('camSelected');
+
+  document.querySelectorAll('.cam-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.make === 'random') {
+        spoofCamera = null;
+        camSelected.textContent = '🎲 Random — a different camera for each image';
+      } else {
+        spoofCamera = { make: btn.dataset.make, model: btn.dataset.model };
+        camSelected.textContent = `📷 ${btn.dataset.model}`;
+      }
+    });
+  });
+
+  // Toggle panels when spoof checkbox changes
   document.getElementById('opt-spoof').addEventListener('change', (e) => {
     locPanel.classList.toggle('disabled', !e.target.checked);
+    camPanel.classList.toggle('disabled', !e.target.checked);
   });
 
   // ── Drop Zone ─────────────────────────────────────────
@@ -836,7 +940,22 @@
   }
 
   // ── Spoof data pool ───────────────────────────────────
-  const cameras = ['Canon EOS R5','Nikon Z9','Sony A7 IV','Fujifilm X-T5','Leica M11','Panasonic S5 II'];
+  const cameras = [
+    { make: 'Canon',      model: 'Canon EOS R5' },
+    { make: 'Nikon',      model: 'Nikon Z9' },
+    { make: 'Sony',       model: 'Sony A7 IV' },
+    { make: 'Fujifilm',   model: 'Fujifilm X-T5' },
+    { make: 'Leica',      model: 'Leica M11' },
+    { make: 'Panasonic',  model: 'Panasonic S5 II' },
+    { make: 'GoPro',      model: 'GoPro HERO12 Black' },
+    { make: 'Apple',      model: 'iPhone 15 Pro Max' },
+    { make: 'Samsung',    model: 'Samsung Galaxy S24 Ultra' },
+    { make: 'Hasselblad', model: 'Hasselblad X2D 100C' },
+    { make: 'DJI',        model: 'DJI Mavic 3 Pro' },
+  ];
+  function getCamera() {
+    return spoofCamera ? spoofCamera : pick(cameras);
+  }
   const lenses  = ['24-70mm f/2.8','50mm f/1.4','85mm f/1.8','35mm f/1.4','70-200mm f/2.8','16-35mm f/4'];
   const software = ['Adobe Lightroom 13.0','Capture One 23','Darktable 4.4','RawTherapee 5.9'];
   const rng = (a,b) => Math.random()*(b-a)+a;
@@ -994,14 +1113,24 @@
     const swOff = dataPtr; dataPtr = align2(dataPtr + swStr.length);
     const dateOff = dataPtr; dataPtr = align2(dataPtr + dateStr.length);
 
+    // GPS timestamp (UTC)
+    const utcNow = new Date();
+    const gpsDateStr = [
+      utcNow.getUTCFullYear(),
+      String(utcNow.getUTCMonth()+1).padStart(2,'0'),
+      String(utcNow.getUTCDate()).padStart(2,'0')
+    ].join(':') + '\0'; // "YYYY:MM:DD\0" = 11 bytes
+    const gpsDateOff = dataPtr; dataPtr = align2(dataPtr + gpsDateStr.length);
+
     // GPS IFD
     const gpsIFDStart = dataPtr;
-    const gpsCount = 5; // VersionID, LatRef, Lat, LngRef, Lng
+    const gpsCount = 7; // VersionID, LatRef, Lat, LngRef, Lng, TimeStamp, DateStamp
     const gpsIFDSize = 2 + (gpsCount * 12) + 4;
     const gpsDataStart = gpsIFDStart + gpsIFDSize;
     const latDataOff = gpsDataStart;
     const lngDataOff = gpsDataStart + 24; // 3 rationals × 8 bytes
-    const totalTiffSize = gpsDataStart + 48;
+    const timeDataOff = gpsDataStart + 48; // 3 rationals × 8 bytes for H, M, S
+    const totalTiffSize = gpsDataStart + 48 + 24;
 
     // ── Build buffer ──
     const buf = new ArrayBuffer(totalTiffSize);
@@ -1050,7 +1179,7 @@
     view.setUint16(pos, 0x0000, true); pos += 2; // tag
     view.setUint16(pos, 1, true); pos += 2;      // type BYTE
     view.setUint32(pos, 4, true); pos += 4;      // count
-    bytes[pos] = 2; bytes[pos+1] = 3; bytes[pos+2] = 0; bytes[pos+3] = 0;
+    bytes[pos] = 2; bytes[pos+1] = 2; bytes[pos+2] = 0; bytes[pos+3] = 0;
     pos += 4;
 
     // GPSLatitudeRef (tag 0x0001) — "N\0" or "S\0", fits inline
@@ -1083,7 +1212,22 @@
     view.setUint32(pos, 3, true); pos += 4;
     view.setUint32(pos, lngDataOff, true); pos += 4;
 
+    // GPSTimeStamp (tag 0x0007) — 3 RATIONALs (H, M, S) in UTC, stored at offset
+    view.setUint16(pos, 0x0007, true); pos += 2;
+    view.setUint16(pos, 5, true); pos += 2; // RATIONAL
+    view.setUint32(pos, 3, true); pos += 4; // count = 3
+    view.setUint32(pos, timeDataOff, true); pos += 4;
+
+    // GPSDateStamp (tag 0x001D) — ASCII "YYYY:MM:DD\0", stored at offset
+    view.setUint16(pos, 0x001D, true); pos += 2;
+    view.setUint16(pos, 2, true); pos += 2; // ASCII
+    view.setUint32(pos, gpsDateStr.length, true); pos += 4;
+    view.setUint32(pos, gpsDateOff, true); pos += 4;
+
     view.setUint32(pos, 0, true); // Next IFD = 0
+
+    // ── Write GPS date string ──
+    writeStr(gpsDateOff, gpsDateStr);
 
     // ── Write GPS DMS rational data ──
     function writeDMS(offset, decimal) {
@@ -1099,6 +1243,11 @@
     }
     writeDMS(latDataOff, lat);
     writeDMS(lngDataOff, lng);
+
+    // ── Write GPS TimeStamp (UTC) — 3 rationals: H/1, M/1, S/1 ──
+    view.setUint32(timeDataOff,      utcNow.getUTCHours(), true);   view.setUint32(timeDataOff + 4,  1, true);
+    view.setUint32(timeDataOff + 8,  utcNow.getUTCMinutes(), true); view.setUint32(timeDataOff + 12, 1, true);
+    view.setUint32(timeDataOff + 16, utcNow.getUTCSeconds(), true); view.setUint32(timeDataOff + 20, 1, true);
 
     // ── Wrap as APP1 segment ──
     const exifIdent = new Uint8Array([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]); // "Exif\0\0"
@@ -1125,6 +1274,79 @@
     result.set(jpegBytes.slice(0, 2), 0);           // SOI
     result.set(exifSegment, 2);                       // New EXIF APP1
     result.set(jpegBytes.slice(2), 2 + exifSegment.length); // Rest of JPEG
+    return result;
+  }
+
+  /**
+   * Build a PNG eXIf chunk containing GPS coordinates + camera spoof data.
+   * The eXIf chunk stores raw TIFF/EXIF data (same as JPEG APP1 minus the "Exif\0\0" header).
+   * Returns Uint8Array of the complete chunk (length + type + data + CRC).
+   */
+  function buildPngExifChunk(lat, lng, cameraMake, cameraModel, softwareName) {
+    // Reuse the EXIF builder — it returns an APP1 segment: FF E1 [len] "Exif\0\0" [TIFF data]
+    const app1 = buildExifSegment(lat, lng, cameraMake, cameraModel, softwareName);
+    // Strip: 2 (marker) + 2 (length) + 6 ("Exif\0\0") = 10 bytes of JPEG wrapper
+    const tiffData = app1.slice(10);
+
+    // Build PNG chunk: 4-byte length + "eXIf" + data + 4-byte CRC
+    const chunkType = new Uint8Array([0x65, 0x58, 0x49, 0x66]); // "eXIf"
+    const chunkLen = tiffData.length;
+    const chunk = new Uint8Array(4 + 4 + chunkLen + 4);
+    const view = new DataView(chunk.buffer);
+
+    // Length (big-endian)
+    view.setUint32(0, chunkLen, false);
+    // Type
+    chunk.set(chunkType, 4);
+    // Data
+    chunk.set(tiffData, 8);
+    // CRC-32 over type + data
+    const crc = crc32(chunk.slice(4, 8 + chunkLen));
+    view.setUint32(8 + chunkLen, crc, false);
+
+    return chunk;
+  }
+
+  /**
+   * CRC-32 for PNG chunk integrity (ISO 3309 / ITU-T V.42).
+   */
+  function crc32(data) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < data.length; i++) {
+      crc ^= data[i];
+      for (let j = 0; j < 8; j++) {
+        crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+      }
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  /**
+   * Inject an eXIf chunk into PNG binary. Inserts before the first IDAT chunk.
+   */
+  function injectExifIntoPng(pngBytes, exifChunk) {
+    const view = new DataView(pngBytes.buffer || pngBytes.slice().buffer);
+    let i = 8; // skip PNG signature
+    let insertPos = -1;
+
+    // Find the first IDAT chunk — insert eXIf before it
+    while (i + 8 <= pngBytes.length) {
+      const chunkLen = view.getUint32(i, false);
+      const typeBytes = pngBytes.slice(i + 4, i + 8);
+      const chunkType = String.fromCharCode(...typeBytes);
+      if (chunkType === 'IDAT') {
+        insertPos = i;
+        break;
+      }
+      i += 4 + 4 + chunkLen + 4; // length + type + data + CRC
+    }
+
+    if (insertPos === -1) insertPos = 8; // fallback: right after signature
+
+    const result = new Uint8Array(pngBytes.length + exifChunk.length);
+    result.set(pngBytes.slice(0, insertPos), 0);
+    result.set(exifChunk, insertPos);
+    result.set(pngBytes.slice(insertPos), insertPos + exifChunk.length);
     return result;
   }
 
@@ -1158,21 +1380,40 @@
               cleaned = optExif ? stripJpegMetadata(arrayBuf) : new Uint8Array(arrayBuf);
               if (!cleaned) throw new Error('Invalid JPEG structure');
 
-              // Inject spoofed EXIF with real GPS coordinates
+              // Inject spoofed EXIF with GPS coordinates (jittered per-image)
               if (optSpoof) {
-                const cam = pick(cameras);
+                const camObj = getCamera();
+                const cam = camObj.model;
+                const make = camObj.make;
                 const sw  = pick(software);
-                const make = cam.split(' ')[0]; // "Canon", "Nikon", etc.
+                const jitteredLat = spoofLocation.lat + (Math.random() - 0.5) * 0.024;
+                const jitteredLng = spoofLocation.lng + (Math.random() - 0.5) * 0.024;
                 const exif = buildExifSegment(
-                  spoofLocation.lat, spoofLocation.lng,
+                  jitteredLat, jitteredLng,
                   make, cam, sw
                 );
                 cleaned = injectExifIntoJpeg(cleaned, exif);
-                addLog(`  EXIF injected → ${cam} | ${sw} | GPS: ${spoofLocation.lat.toFixed(4)}, ${spoofLocation.lng.toFixed(4)}`, 'ok');
+                addLog(`  EXIF injected → ${cam} | ${sw} | GPS: ${jitteredLat.toFixed(4)}, ${jitteredLng.toFixed(4)}`, 'ok');
               }
             } else if (isPNG) {
               cleaned = optExif ? stripPngMetadata(arrayBuf) : new Uint8Array(arrayBuf);
               if (!cleaned) throw new Error('Invalid PNG structure');
+
+              // Inject spoofed EXIF with GPS coordinates into PNG via eXIf chunk
+              if (optSpoof) {
+                const camObj = getCamera();
+                const cam = camObj.model;
+                const make = camObj.make;
+                const sw  = pick(software);
+                const jitteredLat = spoofLocation.lat + (Math.random() - 0.5) * 0.024;
+                const jitteredLng = spoofLocation.lng + (Math.random() - 0.5) * 0.024;
+                const exifChunk = buildPngExifChunk(
+                  jitteredLat, jitteredLng,
+                  make, cam, sw
+                );
+                cleaned = injectExifIntoPng(cleaned, exifChunk);
+                addLog(`  eXIf injected → ${cam} | ${sw} | GPS: ${jitteredLat.toFixed(4)}, ${jitteredLng.toFixed(4)}`, 'ok');
+              }
             }
 
             const base = f.name.replace(/\.[^.]+$/, '').replace(/\s+/g, '_');
@@ -1233,17 +1474,28 @@
 
               let finalBytes = ia;
 
-              // Inject EXIF+GPS into re-encoded JPEG
-              if (optSpoof && mimeOut === 'image/jpeg') {
-                const cam = pick(cameras);
+              // Inject EXIF+GPS into re-encoded output (JPEG or PNG)
+              if (optSpoof) {
+                const camObj = getCamera();
+                const cam = camObj.model;
+                const make = camObj.make;
                 const sw  = pick(software);
-                const make = cam.split(' ')[0];
-                const exif = buildExifSegment(
-                  spoofLocation.lat, spoofLocation.lng,
-                  make, cam, sw
-                );
-                finalBytes = injectExifIntoJpeg(ia, exif);
-                addLog(`  EXIF injected → ${cam} | ${sw} | GPS: ${spoofLocation.lat.toFixed(4)}, ${spoofLocation.lng.toFixed(4)}`, 'ok');
+                const jitteredLat = spoofLocation.lat + (Math.random() - 0.5) * 0.024;
+                const jitteredLng = spoofLocation.lng + (Math.random() - 0.5) * 0.024;
+                if (mimeOut === 'image/jpeg') {
+                  const exif = buildExifSegment(
+                    jitteredLat, jitteredLng,
+                    make, cam, sw
+                  );
+                  finalBytes = injectExifIntoJpeg(ia, exif);
+                } else {
+                  const exifChunk = buildPngExifChunk(
+                    jitteredLat, jitteredLng,
+                    make, cam, sw
+                  );
+                  finalBytes = injectExifIntoPng(ia, exifChunk);
+                }
+                addLog(`  EXIF injected → ${cam} | ${sw} | GPS: ${jitteredLat.toFixed(4)}, ${jitteredLng.toFixed(4)}`, 'ok');
               }
 
               const base = f.name.replace(/\.[^.]+$/, '').replace(/\s+/g, '_');
