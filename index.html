@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Protocol</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Cormorant+Garamond:wght@300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #0A0A0A;
+    --ink: #141414;
+    --surface: #1E1E1E;
+    --border: #2A2A2A;
+    --muted: #5C5C5C;
+    --ghost: #9A9A9A;
+    --paper: #E8E8E4;
+    --white: #F5F5F2;
+    --lotus: #C8A97E;
+    --lotus-dim: #8A7055;
+    --lotus-glow: #C8A97E22;
+    --sans: 'Instrument Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Cormorant Garamond', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--void);
+    color: var(--paper);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+  }
+
+  .logo {
+    width: clamp(56px, 8vw, 72px);
+    height: auto;
+    margin-bottom: 24px;
+    filter: invert(1) brightness(0.92);
+    opacity: 0.85;
+  }
+
+  .wordmark {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: clamp(48px, 7vw, 72px);
+    color: var(--white);
+    letter-spacing: -0.01em;
+    line-height: 1;
+    margin-bottom: 16px;
+  }
+
+  .wordmark em {
+    font-style: italic;
+    color: var(--lotus);
+  }
+
+  .sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 80px;
+  }
+
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    width: 100%;
+    max-width: 760px;
+  }
+
+  .card {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 32px 24px;
+    text-decoration: none;
+    color: var(--paper);
+    transition: border-color 80ms, background 80ms;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    min-height: 220px;
+  }
+
+  .card:hover {
+    border-color: var(--lotus);
+    background: var(--surface);
+  }
+
+  .card-label {
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .card-title {
+    font-family: var(--sans);
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--white);
+    line-height: 1.2;
+  }
+
+  .card-desc {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ghost);
+    margin-top: auto;
+  }
+
+  .card-arrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--lotus);
+    letter-spacing: 0.08em;
+    margin-top: 8px;
+  }
+
+  footer {
+    position: fixed;
+    bottom: 16px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+  <img class="logo" src="assets/inara-logo.png" alt="Inara">
+  <h1 class="wordmark">ghost <em>protocol</em></h1>
+  <p class="sub">Metadata Erasure Engine</p>
+
+  <div class="cards">
+    <a class="card" href="images.html">
+      <span class="card-label">01 — Images</span>
+      <h2 class="card-title">Clean images</h2>
+      <p class="card-desc">Lossless EXIF / XMP strip for JPEG and PNG. Optional GPS and camera spoof.</p>
+      <span class="card-arrow">ENTER →</span>
+    </a>
+    <a class="card" href="videos.html">
+      <span class="card-label">02 — Videos</span>
+      <h2 class="card-title">Clean videos</h2>
+      <p class="card-desc">Stream-copy remux for MP4, MOV, M4V. Zero re-encode. Container metadata stripped and spoofed.</p>
+      <span class="card-arrow">ENTER →</span>
+    </a>
+  </div>
+
+  <footer>v2.1.0 · processed locally · nothing uploaded</footer>
+</body>
+</html>

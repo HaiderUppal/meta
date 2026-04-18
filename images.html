@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Protocol — Images</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Cormorant+Garamond:wght@300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --void: #0A0A0A;
+    --ink: #141414;
+    --surface: #1E1E1E;
+    --border: #2A2A2A;
+    --muted: #5C5C5C;
+    --ghost: #9A9A9A;
+    --paper: #E8E8E4;
+    --white: #F5F5F2;
+    --lotus: #C8A97E;
+    --lotus-dim: #8A7055;
+    --lotus-glow: #C8A97E22;
+    --warn: #ff6666;
+    --sans: 'Instrument Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Cormorant Garamond', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--void);
+    color: var(--paper);
+    font-family: var(--sans);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 24px 120px;
+  }
+
+  /* Back link */
+  .back {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: color 80ms;
+  }
+  .back:hover { color: var(--lotus); }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-top: 32px;
+    margin-bottom: 48px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 36px;
+    color: var(--white);
+    letter-spacing: -0.01em;
+  }
+  h1 em { font-style: italic; color: var(--lotus); }
+
+  .version {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  /* Section labels */
+  .section-label {
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+
+  /* Options panel */
+  .options-panel {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin-bottom: 32px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+
+  .option-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+    padding: 12px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: border-color 80ms;
+  }
+
+  .option-toggle:hover { border-color: var(--muted); }
+  .option-toggle input { display: none; }
+
+  .toggle-box {
+    width: 32px;
+    height: 18px;
+    border-radius: 10px;
+    background: var(--border);
+    position: relative;
+    flex-shrink: 0;
+    transition: background 80ms;
+  }
+
+  .toggle-box::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--muted);
+    top: 3px;
+    left: 3px;
+    transition: transform 80ms, background 80ms;
+  }
+
+  .option-toggle input:checked ~ .toggle-box { background: var(--lotus-glow); }
+  .option-toggle input:checked ~ .toggle-box::after { transform: translateX(14px); background: var(--lotus); }
+
+  .option-label {
+    font-size: 13px;
+    color: var(--paper);
+    line-height: 1.3;
+  }
+
+  .option-label small {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Location + Camera panels */
+  .panel {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: opacity 180ms;
+  }
+  .panel.disabled { opacity: 0.4; pointer-events: none; }
+
+  .panel-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .panel-hint {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .pill-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 80ms;
+    letter-spacing: 0.02em;
+  }
+  .pill:hover { border-color: var(--muted); }
+  .pill.active { border-color: var(--lotus); color: var(--lotus); background: var(--lotus-glow); }
+
+  .loc-custom-label {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+
+  .loc-inputs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .loc-inputs input {
+    background: var(--void);
+    border: 1px solid var(--border);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    flex: 1;
+    min-width: 160px;
+    outline: none;
+    transition: border-color 80ms;
+  }
+  .loc-inputs input:focus { border-color: var(--lotus); }
+
+  .btn-set {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--paper);
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 80ms;
+    letter-spacing: 0.04em;
+  }
+  .btn-set:hover { border-color: var(--lotus); color: var(--lotus); }
+
+  .panel-selected {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--lotus);
+    margin-top: 4px;
+  }
+  .panel-selected .coords {
+    color: var(--muted);
+    font-size: 11px;
+    margin-left: 8px;
+  }
+
+  /* Dropzone */
+  .dropzone {
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 72px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 80ms;
+    background: var(--ink);
+    margin: 32px 0;
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--lotus);
+    background: var(--surface);
+  }
+  #fileInput { display: none; }
+
+  .drop-title {
+    font-size: 15px;
+    color: var(--white);
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .drop-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* Progress */
+  .progress-bar-wrap {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    display: none;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--lotus);
+    transition: width 180ms;
+  }
+
+  /* Queue */
+  .queue {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+
+  .queue-item {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: border-color 80ms;
+  }
+  .queue-item.done { border-color: var(--lotus); }
+  .queue-item.error { border-color: var(--warn); }
+
+  .item-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 3px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--surface);
+  }
+
+  .item-info { flex: 1; min-width: 0; }
+  .item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+  .item-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .item-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .status-waiting { color: var(--muted); }
+  .status-processing { color: var(--paper); }
+  .status-done { color: var(--lotus); }
+  .status-error { color: var(--warn); }
+
+  .item-dl {
+    background: transparent;
+    border: 1px solid var(--lotus);
+    color: var(--lotus);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 80ms;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .item-dl:hover { background: var(--lotus-glow); }
+
+  .item-remove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px 8px;
+    line-height: 1;
+    transition: color 80ms;
+  }
+  .item-remove:hover { color: var(--warn); }
+
+  .empty-queue {
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 32px;
+    display: none;
+  }
+
+  /* Action bar */
+  .action-bar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 14px;
+    padding: 0 20px;
+    height: 40px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 80ms;
+  }
+
+  .btn-primary {
+    background: var(--lotus);
+    color: var(--void);
+    flex: 1;
+    min-width: 180px;
+  }
+  .btn-primary:hover { background: var(--lotus-dim); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--paper);
+    border-color: var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--muted); }
+  .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Log */
+  .log-panel {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.8;
+    max-height: 200px;
+    overflow-y: auto;
+    color: var(--ghost);
+    letter-spacing: 0.02em;
+  }
+  .log-panel .log-ok { color: var(--lotus); }
+  .log-panel .log-info { color: var(--paper); }
+  .log-panel .log-warn { color: #c89e5e; }
+  .log-panel .log-err { color: var(--warn); }
+
+  .log-panel::-webkit-scrollbar { width: 4px; }
+  .log-panel::-webkit-scrollbar-track { background: transparent; }
+  .log-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← BACK</a>
+
+  <header>
+    <h1>clean <em>images</em></h1>
+    <span class="version">v2.1.0</span>
+  </header>
+
+  <!-- Options -->
+  <div class="section-label">Operation Modes</div>
+  <div class="options-panel">
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-exif" checked>
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Strip EXIF / XMP
+        <small>Remove all metadata fields</small>
+      </div>
+    </label>
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-spoof" checked>
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Spoof Origin
+        <small>Inject camera and GPS data</small>
+      </div>
+    </label>
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-noise">
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Pixel Noise
+        <small>Disrupts AI watermarks (re-encodes)</small>
+      </div>
+    </label>
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-recompress">
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Re-encode
+        <small>Lossy — recompresses pixels</small>
+      </div>
+    </label>
+  </div>
+
+  <!-- Location Panel -->
+  <div id="locationPanel" class="panel">
+    <div class="panel-header">
+      <span class="section-label" style="margin:0">GPS Spoof Location</span>
+      <span class="panel-hint">All images stamped with the same coordinates</span>
+    </div>
+    <div class="pill-row" id="locPresets">
+      <button class="pill active" data-lat="48.8566" data-lng="2.3522" data-name="Paris, France">Paris</button>
+      <button class="pill" data-lat="35.6762" data-lng="139.6503" data-name="Tokyo, Japan">Tokyo</button>
+      <button class="pill" data-lat="40.7128" data-lng="-74.0060" data-name="New York, USA">New York</button>
+      <button class="pill" data-lat="51.5074" data-lng="-0.1278" data-name="London, UK">London</button>
+      <button class="pill" data-lat="52.5200" data-lng="13.4050" data-name="Berlin, Germany">Berlin</button>
+      <button class="pill" data-lat="41.9028" data-lng="12.4964" data-name="Rome, Italy">Rome</button>
+      <button class="pill" data-lat="31.5204" data-lng="74.3587" data-name="Lahore, Pakistan">Lahore</button>
+      <button class="pill" data-lat="25.2048" data-lng="55.2708" data-name="Dubai, UAE">Dubai</button>
+      <button class="pill" data-lat="19.0760" data-lng="72.8777" data-name="Mumbai, India">Mumbai</button>
+      <button class="pill" data-lat="1.3521" data-lng="103.8198" data-name="Singapore">Singapore</button>
+      <button class="pill" data-lat="-33.8688" data-lng="151.2093" data-name="Sydney, Australia">Sydney</button>
+      <button class="pill" data-lat="55.7558" data-lng="37.6173" data-name="Moscow, Russia">Moscow</button>
+    </div>
+    <div class="loc-custom-label">Custom coordinates</div>
+    <div class="loc-inputs">
+      <input type="number" id="customLat" placeholder="Latitude — e.g. 48.8566" step="any" min="-90" max="90">
+      <input type="number" id="customLng" placeholder="Longitude — e.g. 2.3522" step="any" min="-180" max="180">
+      <button class="btn-set" id="btnCustomLoc">SET</button>
+    </div>
+    <div class="panel-selected" id="locSelected">Paris, France <span class="coords">48.8566, 2.3522</span></div>
+  </div>
+
+  <!-- Camera Panel -->
+  <div id="cameraPanel" class="panel">
+    <div class="panel-header">
+      <span class="section-label" style="margin:0">Camera Make &amp; Model</span>
+      <span class="panel-hint">Select a camera or let Ghost pick randomly</span>
+    </div>
+    <div class="pill-row" id="camPresets">
+      <button class="pill active" data-make="random" data-model="random">Random</button>
+      <button class="pill" data-make="Canon" data-model="Canon EOS R5">Canon EOS R5</button>
+      <button class="pill" data-make="Nikon" data-model="Nikon Z9">Nikon Z9</button>
+      <button class="pill" data-make="Sony" data-model="Sony A7 IV">Sony A7 IV</button>
+      <button class="pill" data-make="Fujifilm" data-model="Fujifilm X-T5">Fujifilm X-T5</button>
+      <button class="pill" data-make="Leica" data-model="Leica M11">Leica M11</button>
+      <button class="pill" data-make="Panasonic" data-model="Panasonic S5 II">Panasonic S5 II</button>
+      <button class="pill" data-make="GoPro" data-model="GoPro HERO12 Black">GoPro HERO12</button>
+      <button class="pill" data-make="Apple" data-model="iPhone 15 Pro Max">iPhone 15 Pro Max</button>
+      <button class="pill" data-make="Samsung" data-model="Samsung Galaxy S24 Ultra">Galaxy S24 Ultra</button>
+      <button class="pill" data-make="Hasselblad" data-model="Hasselblad X2D 100C">Hasselblad X2D</button>
+      <button class="pill" data-make="DJI" data-model="DJI Mavic 3 Pro">DJI Mavic 3 Pro</button>
+    </div>
+    <div class="panel-selected" id="camSelected">Random — a different camera per image</div>
+  </div>
+
+  <!-- Drop Zone -->
+  <div class="dropzone" id="dropzone">
+    <input type="file" id="fileInput" accept="image/*" multiple>
+    <div class="drop-title">Drop images here</div>
+    <div class="drop-sub">JPG · PNG · WEBP · GIF &nbsp;·&nbsp; Processed locally</div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-bar-wrap" id="progressWrap">
+    <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+  </div>
+
+  <!-- Queue -->
+  <div class="section-label" id="queueLabel" style="display:none">Queue</div>
+  <div class="queue" id="queue"></div>
+  <div class="empty-queue" id="emptyNote">No images loaded</div>
+
+  <!-- Actions -->
+  <div class="action-bar">
+    <button class="btn btn-primary" id="btnProcess" disabled>Process all</button>
+    <button class="btn btn-secondary" id="btnDlAll" disabled>Download all</button>
+    <button class="btn btn-secondary" id="btnClear">Clear</button>
+  </div>
+
+  <!-- Log -->
+  <div class="section-label">Operation Log</div>
+  <div class="log-panel" id="log">
+    <span class="log-info">System ready. All processing is local.</span>
+  </div>
+</div>
+
+<script>
+  // ── State ──────────────────────────────────────────────
+  const files = [];
+  const results = {};
+  let spoofLocation = { lat: 48.8566, lng: 2.3522, name: 'Paris, France' };
+  let spoofCamera = null;
+
+  const dropzone  = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const queue     = document.getElementById('queue');
+  const log       = document.getElementById('log');
+  const btnProcess = document.getElementById('btnProcess');
+  const btnDlAll  = document.getElementById('btnDlAll');
+  const btnClear  = document.getElementById('btnClear');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressFill = document.getElementById('progressFill');
+  const queueLabel = document.getElementById('queueLabel');
+
+  function addLog(msg, type = 'info') {
+    const span = document.createElement('span');
+    span.className = `log-${type}`;
+    const ts = new Date().toLocaleTimeString('en-US', {hour12:false});
+    span.textContent = `[${ts}] ${msg}`;
+    log.appendChild(document.createElement('br'));
+    log.appendChild(span);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // ── Location Panel ────────────────────────────────────
+  const locPanel = document.getElementById('locationPanel');
+  const locSelected = document.getElementById('locSelected');
+
+  function setLocation(lat, lng, name) {
+    spoofLocation = { lat: parseFloat(lat), lng: parseFloat(lng), name };
+    locSelected.innerHTML = `${name} <span class="coords">${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}</span>`;
+    addLog(`GPS spoof set → ${name} (${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)})`, 'info');
+  }
+
+  document.querySelectorAll('#locPresets .pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#locPresets .pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setLocation(btn.dataset.lat, btn.dataset.lng, btn.dataset.name);
+    });
+  });
+
+  document.getElementById('btnCustomLoc').addEventListener('click', () => {
+    const lat = parseFloat(document.getElementById('customLat').value);
+    const lng = parseFloat(document.getElementById('customLng').value);
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      addLog('Invalid coordinates. Lat: -90 to 90, Lng: -180 to 180', 'warn');
+      return;
+    }
+    document.querySelectorAll('#locPresets .pill').forEach(b => b.classList.remove('active'));
+    setLocation(lat, lng, 'Custom Location');
+  });
+
+  // ── Camera Panel ────────────────────────────────────
+  const camPanel = document.getElementById('cameraPanel');
+  const camSelected = document.getElementById('camSelected');
+
+  document.querySelectorAll('#camPresets .pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#camPresets .pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.make === 'random') {
+        spoofCamera = null;
+        camSelected.textContent = 'Random — a different camera per image';
+      } else {
+        spoofCamera = { make: btn.dataset.make, model: btn.dataset.model };
+        camSelected.textContent = btn.dataset.model;
+      }
+    });
+  });
+
+  document.getElementById('opt-spoof').addEventListener('change', (e) => {
+    locPanel.classList.toggle('disabled', !e.target.checked);
+    camPanel.classList.toggle('disabled', !e.target.checked);
+  });
+
+  // ── Drop Zone ─────────────────────────────────────────
+  dropzone.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    handleFiles(e.dataTransfer.files);
+  });
+
+  function handleFiles(incoming) {
+    let added = 0;
+    for (const f of incoming) {
+      if (!f.type.startsWith('image/')) { addLog(`Skipped non-image: ${f.name}`, 'warn'); continue; }
+      if (files.find(x => x.name === f.name && x.size === f.size)) continue;
+      files.push(f);
+      renderQueueItem(f);
+      added++;
+    }
+    if (added) {
+      addLog(`${added} image(s) queued`, 'info');
+      btnProcess.disabled = false;
+      queueLabel.style.display = 'block';
+    }
+  }
+
+  function renderQueueItem(f) {
+    const id = CSS.escape(f.name + f.size);
+    const item = document.createElement('div');
+    item.className = 'queue-item';
+    item.id = `item-${id}`;
+
+    const thumb = document.createElement('img');
+    thumb.className = 'item-thumb';
+    thumb.src = URL.createObjectURL(f);
+
+    const info = document.createElement('div');
+    info.className = 'item-info';
+    info.innerHTML = `
+      <div class="item-name">${f.name}</div>
+      <div class="item-meta">${(f.size/1024).toFixed(1)} KB · ${f.type}</div>
+    `;
+
+    const status = document.createElement('span');
+    status.className = 'item-status status-waiting';
+    status.id = `status-${id}`;
+    status.textContent = 'queued';
+
+    const remove = document.createElement('button');
+    remove.className = 'item-remove';
+    remove.textContent = '×';
+    remove.title = 'Remove';
+    remove.onclick = () => {
+      item.remove();
+      const idx = files.findIndex(x => x.name===f.name && x.size===f.size);
+      if (idx > -1) files.splice(idx, 1);
+      if (!files.length) { btnProcess.disabled = true; queueLabel.style.display='none'; }
+    };
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(status);
+    item.appendChild(remove);
+    queue.appendChild(item);
+  }
+
+  // ── Spoof data pool ───────────────────────────────────
+  const cameras = [
+    { make: 'Canon',      model: 'Canon EOS R5' },
+    { make: 'Nikon',      model: 'Nikon Z9' },
+    { make: 'Sony',       model: 'Sony A7 IV' },
+    { make: 'Fujifilm',   model: 'Fujifilm X-T5' },
+    { make: 'Leica',      model: 'Leica M11' },
+    { make: 'Panasonic',  model: 'Panasonic S5 II' },
+    { make: 'GoPro',      model: 'GoPro HERO12 Black' },
+    { make: 'Apple',      model: 'iPhone 15 Pro Max' },
+    { make: 'Samsung',    model: 'Samsung Galaxy S24 Ultra' },
+    { make: 'Hasselblad', model: 'Hasselblad X2D 100C' },
+    { make: 'DJI',        model: 'DJI Mavic 3 Pro' },
+  ];
+  const lenses  = ['24-70mm f/2.8','50mm f/1.4','85mm f/1.8','35mm f/1.4','70-200mm f/2.8','16-35mm f/4'];
+  const software = ['Adobe Lightroom 13.0','Capture One 23','Darktable 4.4','RawTherapee 5.9'];
+  const rng = (a,b) => Math.random()*(b-a)+a;
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  function getCamera() { return spoofCamera ? spoofCamera : pick(cameras); }
+
+  // ═══════════════════════════════════════════════════════
+  // BINARY JPEG ENGINE — Lossless metadata strip + inject
+  // ═══════════════════════════════════════════════════════
+
+  function stripJpegMetadata(arrayBuffer) {
+    const data = new Uint8Array(arrayBuffer);
+    if (data[0] !== 0xFF || data[1] !== 0xD8) return null;
+
+    const output = [new Uint8Array([0xFF, 0xD8])];
+    let i = 2;
+
+    const stripMarkers = new Set([
+      0xE1, 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7,
+      0xE8, 0xE9, 0xEA, 0xEB, 0xEC, 0xED, 0xEE, 0xEF,
+      0xFE,
+    ]);
+
+    while (i < data.length - 1) {
+      if (data[i] !== 0xFF) { i++; continue; }
+      const marker = data[i + 1];
+
+      if (marker === 0xDA) {
+        output.push(data.slice(i));
+        break;
+      }
+
+      if (marker === 0xD8 || marker === 0xD9 || (marker >= 0xD0 && marker <= 0xD7)) {
+        output.push(data.slice(i, i + 2));
+        i += 2;
+        continue;
+      }
+
+      if (i + 3 < data.length) {
+        const segLen = (data[i + 2] << 8) | data[i + 3];
+        if (stripMarkers.has(marker)) {
+          i += 2 + segLen;
+        } else {
+          output.push(data.slice(i, i + 2 + segLen));
+          i += 2 + segLen;
+        }
+      } else {
+        break;
+      }
+    }
+
+    const totalLen = output.reduce((s, a) => s + a.length, 0);
+    const result = new Uint8Array(totalLen);
+    let offset = 0;
+    for (const chunk of output) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
+
+  function stripPngMetadata(arrayBuffer) {
+    const data = new Uint8Array(arrayBuffer);
+    const view = new DataView(arrayBuffer);
+
+    const pngSig = [137, 80, 78, 71, 13, 10, 26, 10];
+    for (let j = 0; j < 8; j++) {
+      if (data[j] !== pngSig[j]) return null;
+    }
+
+    const output = [data.slice(0, 8)];
+    let i = 8;
+    const stripTypes = new Set(['tEXt', 'iTXt', 'zTXt', 'eXIf']);
+
+    while (i + 8 <= data.length) {
+      const chunkLen = view.getUint32(i, false);
+      const typeBytes = data.slice(i + 4, i + 8);
+      const chunkType = String.fromCharCode(...typeBytes);
+      const totalChunkSize = 4 + 4 + chunkLen + 4;
+
+      if (!stripTypes.has(chunkType)) {
+        output.push(data.slice(i, i + totalChunkSize));
+      }
+      i += totalChunkSize;
+      if (chunkType === 'IEND') break;
+    }
+
+    const totalSize = output.reduce((s, a) => s + a.length, 0);
+    const result = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const chunk of output) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
+
+  function buildExifSegment(lat, lng, cameraMake, cameraModel, softwareName) {
+    const makeStr = cameraMake + '\0';
+    const modelStr = cameraModel + '\0';
+    const swStr = softwareName + '\0';
+    const now = new Date();
+    const dateStr = [
+      now.getFullYear(),
+      String(now.getMonth()+1).padStart(2,'0'),
+      String(now.getDate()).padStart(2,'0')
+    ].join(':') + ' ' + [
+      String(now.getHours()).padStart(2,'0'),
+      String(now.getMinutes()).padStart(2,'0'),
+      String(now.getSeconds()).padStart(2,'0')
+    ].join(':') + '\0';
+
+    const ifd0Count = 5;
+    const ifd0Start = 8;
+    const ifd0Size = 2 + (ifd0Count * 12) + 4;
+    let dataPtr = ifd0Start + ifd0Size;
+
+    const align2 = (n) => (n % 2) ? n + 1 : n;
+
+    const makeOff = dataPtr; dataPtr = align2(dataPtr + makeStr.length);
+    const modelOff = dataPtr; dataPtr = align2(dataPtr + modelStr.length);
+    const swOff = dataPtr; dataPtr = align2(dataPtr + swStr.length);
+    const dateOff = dataPtr; dataPtr = align2(dataPtr + dateStr.length);
+
+    const utcNow = new Date();
+    const gpsDateStr = [
+      utcNow.getUTCFullYear(),
+      String(utcNow.getUTCMonth()+1).padStart(2,'0'),
+      String(utcNow.getUTCDate()).padStart(2,'0')
+    ].join(':') + '\0';
+    const gpsDateOff = dataPtr; dataPtr = align2(dataPtr + gpsDateStr.length);
+
+    const gpsIFDStart = dataPtr;
+    const gpsCount = 7;
+    const gpsIFDSize = 2 + (gpsCount * 12) + 4;
+    const gpsDataStart = gpsIFDStart + gpsIFDSize;
+    const latDataOff = gpsDataStart;
+    const lngDataOff = gpsDataStart + 24;
+    const timeDataOff = gpsDataStart + 48;
+    const totalTiffSize = gpsDataStart + 48 + 24;
+
+    const buf = new ArrayBuffer(totalTiffSize);
+    const view = new DataView(buf);
+    const bytes = new Uint8Array(buf);
+
+    bytes[0] = 0x49; bytes[1] = 0x49;
+    view.setUint16(2, 42, true);
+    view.setUint32(4, ifd0Start, true);
+
+    let pos = ifd0Start;
+    view.setUint16(pos, ifd0Count, true); pos += 2;
+
+    function writeEntry(tag, type, count, value) {
+      view.setUint16(pos, tag, true); pos += 2;
+      view.setUint16(pos, type, true); pos += 2;
+      view.setUint32(pos, count, true); pos += 4;
+      view.setUint32(pos, value, true); pos += 4;
+    }
+
+    writeEntry(0x010F, 2, makeStr.length, makeOff);
+    writeEntry(0x0110, 2, modelStr.length, modelOff);
+    writeEntry(0x0131, 2, swStr.length, swOff);
+    writeEntry(0x0132, 2, dateStr.length, dateOff);
+    writeEntry(0x8825, 4, 1, gpsIFDStart);
+
+    view.setUint32(pos, 0, true);
+
+    function writeStr(offset, str) {
+      for (let k = 0; k < str.length; k++) bytes[offset + k] = str.charCodeAt(k);
+    }
+    writeStr(makeOff, makeStr);
+    writeStr(modelOff, modelStr);
+    writeStr(swOff, swStr);
+    writeStr(dateOff, dateStr);
+
+    pos = gpsIFDStart;
+    view.setUint16(pos, gpsCount, true); pos += 2;
+
+    view.setUint16(pos, 0x0000, true); pos += 2;
+    view.setUint16(pos, 1, true); pos += 2;
+    view.setUint32(pos, 4, true); pos += 4;
+    bytes[pos] = 2; bytes[pos+1] = 2; bytes[pos+2] = 0; bytes[pos+3] = 0;
+    pos += 4;
+
+    const latRef = lat >= 0 ? 'N' : 'S';
+    view.setUint16(pos, 0x0001, true); pos += 2;
+    view.setUint16(pos, 2, true); pos += 2;
+    view.setUint32(pos, 2, true); pos += 4;
+    bytes[pos] = latRef.charCodeAt(0); bytes[pos+1] = 0;
+    bytes[pos+2] = 0; bytes[pos+3] = 0;
+    pos += 4;
+
+    view.setUint16(pos, 0x0002, true); pos += 2;
+    view.setUint16(pos, 5, true); pos += 2;
+    view.setUint32(pos, 3, true); pos += 4;
+    view.setUint32(pos, latDataOff, true); pos += 4;
+
+    const lngRef = lng >= 0 ? 'E' : 'W';
+    view.setUint16(pos, 0x0003, true); pos += 2;
+    view.setUint16(pos, 2, true); pos += 2;
+    view.setUint32(pos, 2, true); pos += 4;
+    bytes[pos] = lngRef.charCodeAt(0); bytes[pos+1] = 0;
+    bytes[pos+2] = 0; bytes[pos+3] = 0;
+    pos += 4;
+
+    view.setUint16(pos, 0x0004, true); pos += 2;
+    view.setUint16(pos, 5, true); pos += 2;
+    view.setUint32(pos, 3, true); pos += 4;
+    view.setUint32(pos, lngDataOff, true); pos += 4;
+
+    view.setUint16(pos, 0x0007, true); pos += 2;
+    view.setUint16(pos, 5, true); pos += 2;
+    view.setUint32(pos, 3, true); pos += 4;
+    view.setUint32(pos, timeDataOff, true); pos += 4;
+
+    view.setUint16(pos, 0x001D, true); pos += 2;
+    view.setUint16(pos, 2, true); pos += 2;
+    view.setUint32(pos, gpsDateStr.length, true); pos += 4;
+    view.setUint32(pos, gpsDateOff, true); pos += 4;
+
+    view.setUint32(pos, 0, true);
+
+    writeStr(gpsDateOff, gpsDateStr);
+
+    function writeDMS(offset, decimal) {
+      const abs = Math.abs(decimal);
+      const d = Math.floor(abs);
+      const mFloat = (abs - d) * 60;
+      const m = Math.floor(mFloat);
+      const s = (mFloat - m) * 60;
+      const sNum = Math.round(s * 10000);
+      view.setUint32(offset,      d, true);     view.setUint32(offset + 4,  1, true);
+      view.setUint32(offset + 8,  m, true);     view.setUint32(offset + 12, 1, true);
+      view.setUint32(offset + 16, sNum, true);  view.setUint32(offset + 20, 10000, true);
+    }
+    writeDMS(latDataOff, lat);
+    writeDMS(lngDataOff, lng);
+
+    view.setUint32(timeDataOff,      utcNow.getUTCHours(), true);   view.setUint32(timeDataOff + 4,  1, true);
+    view.setUint32(timeDataOff + 8,  utcNow.getUTCMinutes(), true); view.setUint32(timeDataOff + 12, 1, true);
+    view.setUint32(timeDataOff + 16, utcNow.getUTCSeconds(), true); view.setUint32(timeDataOff + 20, 1, true);
+
+    const exifIdent = new Uint8Array([0x45, 0x78, 0x69, 0x66, 0x00, 0x00]);
+    const payload = new Uint8Array(6 + totalTiffSize);
+    payload.set(exifIdent, 0);
+    payload.set(new Uint8Array(buf), 6);
+
+    const app1Len = payload.length + 2;
+    const segment = new Uint8Array(2 + 2 + payload.length);
+    segment[0] = 0xFF; segment[1] = 0xE1;
+    segment[2] = (app1Len >> 8) & 0xFF;
+    segment[3] = app1Len & 0xFF;
+    segment.set(payload, 4);
+
+    return segment;
+  }
+
+  function injectExifIntoJpeg(jpegBytes, exifSegment) {
+    const result = new Uint8Array(jpegBytes.length + exifSegment.length);
+    result.set(jpegBytes.slice(0, 2), 0);
+    result.set(exifSegment, 2);
+    result.set(jpegBytes.slice(2), 2 + exifSegment.length);
+    return result;
+  }
+
+  function buildPngExifChunk(lat, lng, cameraMake, cameraModel, softwareName) {
+    const app1 = buildExifSegment(lat, lng, cameraMake, cameraModel, softwareName);
+    const tiffData = app1.slice(10);
+    const chunkType = new Uint8Array([0x65, 0x58, 0x49, 0x66]);
+    const chunkLen = tiffData.length;
+    const chunk = new Uint8Array(4 + 4 + chunkLen + 4);
+    const view = new DataView(chunk.buffer);
+    view.setUint32(0, chunkLen, false);
+    chunk.set(chunkType, 4);
+    chunk.set(tiffData, 8);
+    const crc = crc32(chunk.slice(4, 8 + chunkLen));
+    view.setUint32(8 + chunkLen, crc, false);
+    return chunk;
+  }
+
+  function crc32(data) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < data.length; i++) {
+      crc ^= data[i];
+      for (let j = 0; j < 8; j++) {
+        crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+      }
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function injectExifIntoPng(pngBytes, exifChunk) {
+    const view = new DataView(pngBytes.buffer || pngBytes.slice().buffer);
+    let i = 8;
+    let insertPos = -1;
+
+    while (i + 8 <= pngBytes.length) {
+      const chunkLen = view.getUint32(i, false);
+      const typeBytes = pngBytes.slice(i + 4, i + 8);
+      const chunkType = String.fromCharCode(...typeBytes);
+      if (chunkType === 'IDAT') {
+        insertPos = i;
+        break;
+      }
+      i += 4 + 4 + chunkLen + 4;
+    }
+
+    if (insertPos === -1) insertPos = 8;
+
+    const result = new Uint8Array(pngBytes.length + exifChunk.length);
+    result.set(pngBytes.slice(0, insertPos), 0);
+    result.set(exifChunk, insertPos);
+    result.set(pngBytes.slice(insertPos), insertPos + exifChunk.length);
+    return result;
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // CORE PROCESSING
+  // ═══════════════════════════════════════════════════════
+
+  async function processFile(f) {
+    const optExif  = document.getElementById('opt-exif').checked;
+    const optSpoof = document.getElementById('opt-spoof').checked;
+    const optNoise = document.getElementById('opt-noise').checked;
+    const optRecompress = document.getElementById('opt-recompress').checked;
+
+    const isJPEG = (f.type === 'image/jpeg' || f.type === 'image/jpg');
+    const isPNG  = (f.type === 'image/png');
+
+    const needCanvas = optNoise || optRecompress;
+    const canBinaryStrip = (isJPEG || isPNG) && !needCanvas;
+
+    if (canBinaryStrip) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const arrayBuf = e.target.result;
+            let cleaned;
+
+            if (isJPEG) {
+              cleaned = optExif ? stripJpegMetadata(arrayBuf) : new Uint8Array(arrayBuf);
+              if (!cleaned) throw new Error('Invalid JPEG structure');
+
+              if (optSpoof) {
+                const camObj = getCamera();
+                const cam = camObj.model;
+                const make = camObj.make;
+                const sw  = pick(software);
+                const jitteredLat = spoofLocation.lat + (Math.random() - 0.5) * 0.024;
+                const jitteredLng = spoofLocation.lng + (Math.random() - 0.5) * 0.024;
+                const exif = buildExifSegment(jitteredLat, jitteredLng, make, cam, sw);
+                cleaned = injectExifIntoJpeg(cleaned, exif);
+                addLog(`  EXIF injected → ${cam} | ${sw} | ${jitteredLat.toFixed(4)}, ${jitteredLng.toFixed(4)}`, 'ok');
+              }
+            } else if (isPNG) {
+              cleaned = optExif ? stripPngMetadata(arrayBuf) : new Uint8Array(arrayBuf);
+              if (!cleaned) throw new Error('Invalid PNG structure');
+
+              if (optSpoof) {
+                const camObj = getCamera();
+                const cam = camObj.model;
+                const make = camObj.make;
+                const sw  = pick(software);
+                const jitteredLat = spoofLocation.lat + (Math.random() - 0.5) * 0.024;
+                const jitteredLng = spoofLocation.lng + (Math.random() - 0.5) * 0.024;
+                const exifChunk = buildPngExifChunk(jitteredLat, jitteredLng, make, cam, sw);
+                cleaned = injectExifIntoPng(cleaned, exifChunk);
+                addLog(`  eXIf injected → ${cam} | ${sw} | ${jitteredLat.toFixed(4)}, ${jitteredLng.toFixed(4)}`, 'ok');
+              }
+            }
+
+            const mime = isJPEG ? 'image/jpeg' : 'image/png';
+            const outName = f.name;
+            const blob = new Blob([cleaned], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+
+            addLog(`  LOSSLESS — ${(f.size/1024).toFixed(1)} KB → ${(blob.size/1024).toFixed(1)} KB`, 'info');
+
+            resolve({ outName, blobUrl, size: blob.size });
+          } catch (err) { reject(err); }
+        };
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsArrayBuffer(f);
+      });
+    } else {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (re) => {
+          const img = new Image();
+          img.onload = () => {
+            try {
+              const canvas = document.createElement('canvas');
+              canvas.width  = img.naturalWidth;
+              canvas.height = img.naturalHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0);
+
+              if (optNoise) {
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const px = imageData.data;
+                for (let p = 0; p < px.length; p += 4) {
+                  if (Math.random() < 0.08) {
+                    px[p]   = Math.min(255, Math.max(0, px[p]   + (Math.random() < 0.5 ? 1 : -1)));
+                    px[p+1] = Math.min(255, Math.max(0, px[p+1] + (Math.random() < 0.5 ? 1 : -1)));
+                    px[p+2] = Math.min(255, Math.max(0, px[p+2] + (Math.random() < 0.5 ? 1 : -1)));
+                  }
+                }
+                ctx.putImageData(imageData, 0, 0);
+              }
+
+              const mimeOut = (isPNG && !optRecompress) ? 'image/png' : 'image/jpeg';
+              const quality = optRecompress ? rng(0.88, 0.96) : 0.95;
+              const dataURL = canvas.toDataURL(mimeOut, quality);
+
+              const byteStr = atob(dataURL.split(',')[1]);
+              const ab = new ArrayBuffer(byteStr.length);
+              const ia = new Uint8Array(ab);
+              for (let j = 0; j < byteStr.length; j++) ia[j] = byteStr.charCodeAt(j);
+
+              let finalBytes = ia;
+
+              if (optSpoof) {
+                const camObj = getCamera();
+                const cam = camObj.model;
+                const make = camObj.make;
+                const sw  = pick(software);
+                const jitteredLat = spoofLocation.lat + (Math.random() - 0.5) * 0.024;
+                const jitteredLng = spoofLocation.lng + (Math.random() - 0.5) * 0.024;
+                if (mimeOut === 'image/jpeg') {
+                  const exif = buildExifSegment(jitteredLat, jitteredLng, make, cam, sw);
+                  finalBytes = injectExifIntoJpeg(ia, exif);
+                } else {
+                  const exifChunk = buildPngExifChunk(jitteredLat, jitteredLng, make, cam, sw);
+                  finalBytes = injectExifIntoPng(ia, exifChunk);
+                }
+                addLog(`  EXIF injected → ${cam} | ${sw} | ${jitteredLat.toFixed(4)}, ${jitteredLng.toFixed(4)}`, 'ok');
+              }
+
+              const outName = f.name;
+              const blob = new Blob([finalBytes], { type: mimeOut });
+              const blobUrl = URL.createObjectURL(blob);
+
+              addLog(`  RE-ENCODED — canvas path (noise: ${optNoise}, recompress: ${optRecompress})`, 'warn');
+
+              resolve({ outName, blobUrl, size: blob.size });
+            } catch (err) { reject(err); }
+          };
+          img.onerror = () => reject(new Error('Image failed to load'));
+          img.src = re.target.result;
+        };
+        reader.onerror = () => reject(new Error('Could not read file'));
+        reader.readAsDataURL(f);
+      });
+    }
+  }
+
+  btnProcess.addEventListener('click', async () => {
+    if (!files.length) return;
+    btnProcess.disabled = true;
+    btnClear.disabled = true;
+    progressWrap.style.display = 'block';
+
+    const optNoise = document.getElementById('opt-noise').checked;
+    const optRecompress = document.getElementById('opt-recompress').checked;
+    const mode = (!optNoise && !optRecompress) ? 'LOSSLESS BINARY' : 'CANVAS RE-ENCODE';
+    addLog(`Starting batch — ${files.length} image(s) — mode: ${mode}`, 'info');
+
+    let done = 0;
+    for (const f of files) {
+      const id = CSS.escape(f.name + f.size);
+      const statusEl = document.getElementById(`status-${id}`);
+      const itemEl   = document.getElementById(`item-${id}`);
+
+      if (statusEl) {
+        statusEl.className = 'item-status status-processing';
+        statusEl.textContent = 'processing';
+      }
+      addLog(`Processing: ${f.name}`, 'info');
+
+      try {
+        const result = await processFile(f);
+        if (!result) throw new Error('Processing returned no result');
+        results[f.name] = result;
+
+        if (statusEl) { statusEl.className = 'item-status status-done'; statusEl.textContent = 'clean'; }
+        if (itemEl) {
+          itemEl.classList.add('done');
+          const dl = document.createElement('a');
+          dl.className = 'item-dl';
+          dl.href = result.blobUrl;
+          dl.download = result.outName;
+          dl.textContent = 'save';
+          dl.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const zip = new JSZip();
+            const blob = await fetch(result.blobUrl).then(r => r.blob());
+            zip.file(result.outName, blob);
+            const zipBlob = await zip.generateAsync({type: 'blob'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(zipBlob);
+            a.download = result.outName.replace(/\.[^.]+$/, '') + '_clean.zip';
+            a.click();
+            URL.revokeObjectURL(a.href);
+            addLog(`Packed ${result.outName} into ZIP`, 'ok');
+          });
+          itemEl.insertBefore(dl, itemEl.lastChild);
+        }
+        addLog(`✓ ${f.name} → ${(result.size/1024).toFixed(1)} KB`, 'ok');
+      } catch (err) {
+        if (statusEl) { statusEl.className = 'item-status status-error'; statusEl.textContent = 'error'; }
+        if (itemEl) itemEl.classList.add('error');
+        addLog(`✗ ${f.name} — ${err.message}`, 'err');
+      }
+      done++;
+      progressFill.style.width = `${(done/files.length)*100}%`;
+    }
+
+    addLog(`Batch complete. ${done} image(s) processed.`, 'ok');
+    btnProcess.disabled = false;
+    btnClear.disabled  = false;
+    btnDlAll.disabled  = Object.keys(results).length === 0;
+    progressFill.style.width = '100%';
+    setTimeout(() => { progressWrap.style.display = 'none'; progressFill.style.width='0%'; }, 2000);
+  });
+
+  btnDlAll.addEventListener('click', async () => {
+    const entries = Object.values(results);
+    if (!entries.length) return;
+    addLog(`Packing ${entries.length} clean image(s) into ZIP`, 'info');
+    const zip = new JSZip();
+    for (const r of entries) {
+      const blob = await fetch(r.blobUrl).then(res => res.blob());
+      zip.file(r.outName, blob);
+    }
+    const zipBlob = await zip.generateAsync({type: 'blob'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = 'ghost_clean_' + Date.now() + '.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    addLog(`ZIP ready`, 'ok');
+  });
+
+  btnClear.addEventListener('click', () => {
+    files.length = 0;
+    Object.keys(results).forEach(k => delete results[k]);
+    queue.innerHTML = '';
+    btnProcess.disabled = true;
+    btnDlAll.disabled = true;
+    queueLabel.style.display = 'none';
+    addLog('Queue cleared', 'info');
+  });
+</script>
+</body>
+</html>

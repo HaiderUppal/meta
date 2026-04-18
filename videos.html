@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ghost Protocol — Videos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Sans:wght@400;500;600&family=Cormorant+Garamond:wght@300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root {
+    --void: #0A0A0A;
+    --ink: #141414;
+    --surface: #1E1E1E;
+    --border: #2A2A2A;
+    --muted: #5C5C5C;
+    --ghost: #9A9A9A;
+    --paper: #E8E8E4;
+    --white: #F5F5F2;
+    --lotus: #C8A97E;
+    --lotus-dim: #8A7055;
+    --lotus-glow: #C8A97E22;
+    --warn: #ff6666;
+    --sans: 'Instrument Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --serif: 'Cormorant Garamond', serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--void);
+    color: var(--paper);
+    font-family: var(--sans);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 48px 24px 120px; }
+
+  .back {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: color 80ms;
+  }
+  .back:hover { color: var(--lotus); }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-top: 32px;
+    margin-bottom: 48px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 24px;
+  }
+
+  h1 {
+    font-family: var(--serif);
+    font-weight: 300;
+    font-size: 36px;
+    color: var(--white);
+    letter-spacing: -0.01em;
+  }
+  h1 em { font-style: italic; color: var(--lotus); }
+
+  .version {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .section-label {
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+
+  /* Engine status banner */
+  .engine-status {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--lotus);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin-bottom: 32px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ghost);
+    letter-spacing: 0.02em;
+  }
+  .engine-status.ready { border-left-color: var(--lotus); }
+  .engine-status.loading { border-left-color: var(--muted); }
+  .engine-status.error { border-left-color: var(--warn); color: var(--warn); }
+
+  /* Panels */
+  .panel {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 24px;
+    margin-bottom: 24px;
+    transition: opacity 180ms;
+  }
+  .panel.disabled { opacity: 0.4; pointer-events: none; }
+
+  .options-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    padding: 24px;
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 32px;
+  }
+
+  .option-toggle {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+    padding: 12px 16px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: border-color 80ms;
+  }
+  .option-toggle:hover { border-color: var(--muted); }
+  .option-toggle input { display: none; }
+
+  .toggle-box {
+    width: 32px;
+    height: 18px;
+    border-radius: 10px;
+    background: var(--border);
+    position: relative;
+    flex-shrink: 0;
+    transition: background 80ms;
+  }
+  .toggle-box::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--muted);
+    top: 3px;
+    left: 3px;
+    transition: transform 80ms, background 80ms;
+  }
+  .option-toggle input:checked ~ .toggle-box { background: var(--lotus-glow); }
+  .option-toggle input:checked ~ .toggle-box::after { transform: translateX(14px); background: var(--lotus); }
+
+  .option-label { font-size: 13px; color: var(--paper); line-height: 1.3; }
+  .option-label small {
+    display: block;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    letter-spacing: 0.02em;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .panel-hint {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+
+  .pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 80ms;
+    letter-spacing: 0.02em;
+  }
+  .pill:hover { border-color: var(--muted); }
+  .pill.active { border-color: var(--lotus); color: var(--lotus); background: var(--lotus-glow); }
+
+  .loc-custom-label {
+    font-family: var(--sans);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    line-height: 1.2;
+  }
+
+  .loc-inputs {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .loc-inputs input {
+    background: var(--void);
+    border: 1px solid var(--border);
+    color: var(--paper);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    flex: 1;
+    min-width: 160px;
+    outline: none;
+    transition: border-color 80ms;
+  }
+  .loc-inputs input:focus { border-color: var(--lotus); }
+
+  .btn-set {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--paper);
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 80ms;
+    letter-spacing: 0.04em;
+  }
+  .btn-set:hover { border-color: var(--lotus); color: var(--lotus); }
+
+  .panel-selected {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--lotus);
+    margin-top: 4px;
+  }
+  .panel-selected .coords { color: var(--muted); font-size: 11px; margin-left: 8px; }
+
+  /* Dropzone */
+  .dropzone {
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 72px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 80ms;
+    background: var(--ink);
+    margin: 32px 0;
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--lotus);
+    background: var(--surface);
+  }
+  .dropzone.inactive {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  #fileInput { display: none; }
+
+  .drop-title { font-size: 15px; color: var(--white); margin-bottom: 8px; font-weight: 500; }
+  .drop-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .progress-bar-wrap {
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    display: none;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--lotus);
+    transition: width 180ms;
+  }
+
+  .queue { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+
+  .queue-item {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    transition: border-color 80ms;
+  }
+  .queue-item.done { border-color: var(--lotus); }
+  .queue-item.error { border-color: var(--warn); }
+
+  .item-thumb {
+    width: 64px;
+    height: 44px;
+    border-radius: 3px;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  .item-info { flex: 1; min-width: 0; }
+  .item-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--white);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 2px;
+  }
+  .item-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .item-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .status-waiting { color: var(--muted); }
+  .status-processing { color: var(--paper); }
+  .status-done { color: var(--lotus); }
+  .status-error { color: var(--warn); }
+
+  .item-dl {
+    background: transparent;
+    border: 1px solid var(--lotus);
+    color: var(--lotus);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 3px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 80ms;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .item-dl:hover { background: var(--lotus-glow); }
+
+  .item-remove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px 8px;
+    line-height: 1;
+    transition: color 80ms;
+  }
+  .item-remove:hover { color: var(--warn); }
+
+  .action-bar { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 32px; }
+
+  .btn {
+    font-family: var(--sans);
+    font-weight: 500;
+    font-size: 14px;
+    padding: 0 20px;
+    height: 40px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: all 80ms;
+  }
+  .btn-primary {
+    background: var(--lotus);
+    color: var(--void);
+    flex: 1;
+    min-width: 180px;
+  }
+  .btn-primary:hover { background: var(--lotus-dim); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary {
+    background: transparent;
+    color: var(--paper);
+    border-color: var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--muted); }
+  .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .log-panel {
+    background: var(--ink);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px 20px;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.8;
+    max-height: 220px;
+    overflow-y: auto;
+    color: var(--ghost);
+    letter-spacing: 0.02em;
+  }
+  .log-panel .log-ok { color: var(--lotus); }
+  .log-panel .log-info { color: var(--paper); }
+  .log-panel .log-warn { color: #c89e5e; }
+  .log-panel .log-err { color: var(--warn); }
+
+  .log-panel::-webkit-scrollbar { width: 4px; }
+  .log-panel::-webkit-scrollbar-track { background: transparent; }
+  .log-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .note {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-bottom: 24px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+    line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="index.html">← BACK</a>
+
+  <header>
+    <h1>clean <em>videos</em></h1>
+    <span class="version">v2.1.0</span>
+  </header>
+
+  <div class="note">
+    Lossless pipeline — stream-copy remux, zero re-encode. Container metadata is stripped and replaced with the spoofed values below. Video and audio bitstreams are preserved byte-for-byte.
+    <br><br>
+    If the engine fails to load, serve this folder over HTTP (<span style="color:var(--paper)">python3 -m http.server</span>) and open <span style="color:var(--paper)">http://localhost:8000/videos.html</span>.
+  </div>
+
+  <div class="engine-status loading" id="engineStatus">Loading engine…</div>
+
+  <!-- Options -->
+  <div class="section-label">Operation Modes</div>
+  <div class="options-panel">
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-strip" checked>
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Strip Container Metadata
+        <small>Remove encoder, creation date, tags</small>
+      </div>
+    </label>
+    <label class="option-toggle">
+      <input type="checkbox" id="opt-spoof" checked>
+      <div class="toggle-box"></div>
+      <div class="option-label">
+        Spoof Origin
+        <small>Inject camera, GPS, creation date</small>
+      </div>
+    </label>
+  </div>
+
+  <!-- Location Panel -->
+  <div id="locationPanel" class="panel">
+    <div class="panel-header">
+      <span class="section-label" style="margin:0">GPS Spoof Location</span>
+      <span class="panel-hint">Written as ISO 6709 + Apple QuickTime location tags</span>
+    </div>
+    <div class="pill-row" id="locPresets">
+      <button class="pill active" data-lat="48.8566" data-lng="2.3522" data-name="Paris, France">Paris</button>
+      <button class="pill" data-lat="35.6762" data-lng="139.6503" data-name="Tokyo, Japan">Tokyo</button>
+      <button class="pill" data-lat="40.7128" data-lng="-74.0060" data-name="New York, USA">New York</button>
+      <button class="pill" data-lat="51.5074" data-lng="-0.1278" data-name="London, UK">London</button>
+      <button class="pill" data-lat="52.5200" data-lng="13.4050" data-name="Berlin, Germany">Berlin</button>
+      <button class="pill" data-lat="41.9028" data-lng="12.4964" data-name="Rome, Italy">Rome</button>
+      <button class="pill" data-lat="31.5204" data-lng="74.3587" data-name="Lahore, Pakistan">Lahore</button>
+      <button class="pill" data-lat="25.2048" data-lng="55.2708" data-name="Dubai, UAE">Dubai</button>
+      <button class="pill" data-lat="19.0760" data-lng="72.8777" data-name="Mumbai, India">Mumbai</button>
+      <button class="pill" data-lat="1.3521" data-lng="103.8198" data-name="Singapore">Singapore</button>
+      <button class="pill" data-lat="-33.8688" data-lng="151.2093" data-name="Sydney, Australia">Sydney</button>
+      <button class="pill" data-lat="55.7558" data-lng="37.6173" data-name="Moscow, Russia">Moscow</button>
+    </div>
+    <div class="loc-custom-label">Custom coordinates</div>
+    <div class="loc-inputs">
+      <input type="number" id="customLat" placeholder="Latitude — e.g. 48.8566" step="any" min="-90" max="90">
+      <input type="number" id="customLng" placeholder="Longitude — e.g. 2.3522" step="any" min="-180" max="180">
+      <button class="btn-set" id="btnCustomLoc">SET</button>
+    </div>
+    <div class="panel-selected" id="locSelected">Paris, France <span class="coords">48.8566, 2.3522</span></div>
+  </div>
+
+  <!-- Camera Panel -->
+  <div id="cameraPanel" class="panel">
+    <div class="panel-header">
+      <span class="section-label" style="margin:0">Camera Make &amp; Model</span>
+      <span class="panel-hint">Written as make / model / software metadata</span>
+    </div>
+    <div class="pill-row" id="camPresets">
+      <button class="pill active" data-make="random" data-model="random">Random</button>
+      <button class="pill" data-make="Apple" data-model="iPhone 15 Pro Max">iPhone 15 Pro Max</button>
+      <button class="pill" data-make="Apple" data-model="iPhone 14 Pro">iPhone 14 Pro</button>
+      <button class="pill" data-make="Samsung" data-model="Samsung Galaxy S24 Ultra">Galaxy S24 Ultra</button>
+      <button class="pill" data-make="Sony" data-model="Sony A7 IV">Sony A7 IV</button>
+      <button class="pill" data-make="Canon" data-model="Canon EOS R5">Canon EOS R5</button>
+      <button class="pill" data-make="Nikon" data-model="Nikon Z9">Nikon Z9</button>
+      <button class="pill" data-make="Panasonic" data-model="Panasonic GH6">Panasonic GH6</button>
+      <button class="pill" data-make="GoPro" data-model="GoPro HERO12 Black">GoPro HERO12</button>
+      <button class="pill" data-make="DJI" data-model="DJI Pocket 3">DJI Pocket 3</button>
+      <button class="pill" data-make="DJI" data-model="DJI Mavic 3 Pro">DJI Mavic 3 Pro</button>
+      <button class="pill" data-make="Insta360" data-model="Insta360 X4">Insta360 X4</button>
+    </div>
+    <div class="panel-selected" id="camSelected">Random — a different camera per video</div>
+  </div>
+
+  <!-- Drop Zone -->
+  <div class="dropzone inactive" id="dropzone">
+    <input type="file" id="fileInput" accept="video/mp4,video/quicktime,video/x-m4v,.mp4,.mov,.m4v" multiple>
+    <div class="drop-title">Drop videos here</div>
+    <div class="drop-sub">MP4 · MOV · M4V &nbsp;·&nbsp; Under 500 MB &nbsp;·&nbsp; Processed locally</div>
+  </div>
+
+  <div class="progress-bar-wrap" id="progressWrap">
+    <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+  </div>
+
+  <div class="section-label" id="queueLabel" style="display:none">Queue</div>
+  <div class="queue" id="queue"></div>
+
+  <div class="action-bar">
+    <button class="btn btn-primary" id="btnProcess" disabled>Process all</button>
+    <button class="btn btn-secondary" id="btnDlAll" disabled>Download all</button>
+    <button class="btn btn-secondary" id="btnClear">Clear</button>
+  </div>
+
+  <div class="section-label">Operation Log</div>
+  <div class="log-panel" id="log">
+    <span class="log-info">System ready. All processing is local.</span>
+  </div>
+</div>
+
+<!-- ffmpeg.wasm (single-threaded core — no SharedArrayBuffer needed) -->
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js"></script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.2/dist/umd/index.js"></script>
+
+<script>
+  // ── State ──────────────────────────────────────────────
+  const files = [];
+  const results = {};
+  let spoofLocation = { lat: 48.8566, lng: 2.3522, name: 'Paris, France' };
+  let spoofCamera = null;
+  let ffmpeg = null;
+  let engineReady = false;
+
+  const dropzone  = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const queueEl   = document.getElementById('queue');
+  const log       = document.getElementById('log');
+  const btnProcess = document.getElementById('btnProcess');
+  const btnDlAll  = document.getElementById('btnDlAll');
+  const btnClear  = document.getElementById('btnClear');
+  const progressWrap = document.getElementById('progressWrap');
+  const progressFill = document.getElementById('progressFill');
+  const queueLabel = document.getElementById('queueLabel');
+  const engineStatus = document.getElementById('engineStatus');
+
+  function addLog(msg, type = 'info') {
+    const span = document.createElement('span');
+    span.className = `log-${type}`;
+    const ts = new Date().toLocaleTimeString('en-US', {hour12:false});
+    span.textContent = `[${ts}] ${msg}`;
+    log.appendChild(document.createElement('br'));
+    log.appendChild(span);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  // ── FFmpeg bootstrap ──────────────────────────────────
+  async function loadEngine() {
+    try {
+      engineStatus.className = 'engine-status loading';
+      engineStatus.textContent = 'Loading engine — this can take 20-30s on first run…';
+
+      const { FFmpeg } = FFmpegWASM;
+      const { toBlobURL } = FFmpegUtil;
+      ffmpeg = new FFmpeg();
+
+      ffmpeg.on('log', ({ message }) => {
+        // Keep ffmpeg chatter out of the user-visible log, but keep it in dev console
+        console.log('[ffmpeg]', message);
+      });
+
+      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      });
+
+      engineReady = true;
+      engineStatus.className = 'engine-status ready';
+      engineStatus.textContent = 'Engine ready — drop a video to begin';
+      dropzone.classList.remove('inactive');
+      addLog('Engine loaded', 'ok');
+    } catch (err) {
+      engineStatus.className = 'engine-status error';
+      engineStatus.textContent = 'Engine failed to load. Serve via HTTP: python3 -m http.server';
+      addLog(`Engine load failed: ${err.message}`, 'err');
+      console.error(err);
+    }
+  }
+
+  loadEngine();
+
+  // ── Location Panel ────────────────────────────────────
+  const locPanel = document.getElementById('locationPanel');
+  const locSelected = document.getElementById('locSelected');
+
+  function setLocation(lat, lng, name) {
+    spoofLocation = { lat: parseFloat(lat), lng: parseFloat(lng), name };
+    locSelected.innerHTML = `${name} <span class="coords">${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)}</span>`;
+    addLog(`GPS spoof set → ${name} (${parseFloat(lat).toFixed(4)}, ${parseFloat(lng).toFixed(4)})`, 'info');
+  }
+
+  document.querySelectorAll('#locPresets .pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#locPresets .pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      setLocation(btn.dataset.lat, btn.dataset.lng, btn.dataset.name);
+    });
+  });
+
+  document.getElementById('btnCustomLoc').addEventListener('click', () => {
+    const lat = parseFloat(document.getElementById('customLat').value);
+    const lng = parseFloat(document.getElementById('customLng').value);
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      addLog('Invalid coordinates. Lat: -90 to 90, Lng: -180 to 180', 'warn');
+      return;
+    }
+    document.querySelectorAll('#locPresets .pill').forEach(b => b.classList.remove('active'));
+    setLocation(lat, lng, 'Custom Location');
+  });
+
+  // ── Camera Panel ──────────────────────────────────────
+  const camPanel = document.getElementById('cameraPanel');
+  const camSelected = document.getElementById('camSelected');
+
+  document.querySelectorAll('#camPresets .pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#camPresets .pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (btn.dataset.make === 'random') {
+        spoofCamera = null;
+        camSelected.textContent = 'Random — a different camera per video';
+      } else {
+        spoofCamera = { make: btn.dataset.make, model: btn.dataset.model };
+        camSelected.textContent = btn.dataset.model;
+      }
+    });
+  });
+
+  document.getElementById('opt-spoof').addEventListener('change', (e) => {
+    locPanel.classList.toggle('disabled', !e.target.checked);
+    camPanel.classList.toggle('disabled', !e.target.checked);
+  });
+
+  // ── Camera pool ───────────────────────────────────────
+  const cameras = [
+    { make: 'Apple',    model: 'iPhone 15 Pro Max' },
+    { make: 'Apple',    model: 'iPhone 14 Pro' },
+    { make: 'Samsung',  model: 'Samsung Galaxy S24 Ultra' },
+    { make: 'Sony',     model: 'Sony A7 IV' },
+    { make: 'Canon',    model: 'Canon EOS R5' },
+    { make: 'Nikon',    model: 'Nikon Z9' },
+    { make: 'Panasonic',model: 'Panasonic GH6' },
+    { make: 'GoPro',    model: 'GoPro HERO12 Black' },
+    { make: 'DJI',      model: 'DJI Pocket 3' },
+    { make: 'DJI',      model: 'DJI Mavic 3 Pro' },
+    { make: 'Insta360', model: 'Insta360 X4' },
+  ];
+  const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+  function getCamera() { return spoofCamera ? spoofCamera : pick(cameras); }
+
+  // ── Drop Zone ─────────────────────────────────────────
+  dropzone.addEventListener('click', () => { if (engineReady) fileInput.click(); });
+  fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+  dropzone.addEventListener('dragover', e => { e.preventDefault(); if (engineReady) dropzone.classList.add('dragover'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (engineReady) handleFiles(e.dataTransfer.files);
+  });
+
+  const MAX_SIZE = 500 * 1024 * 1024; // 500 MB
+  const VIDEO_EXT = /\.(mp4|mov|m4v)$/i;
+
+  function handleFiles(incoming) {
+    let added = 0;
+    for (const f of incoming) {
+      const isVideo = f.type.startsWith('video/') || VIDEO_EXT.test(f.name);
+      if (!isVideo) { addLog(`Skipped non-video: ${f.name}`, 'warn'); continue; }
+      if (!VIDEO_EXT.test(f.name)) { addLog(`Unsupported format (need MP4/MOV/M4V): ${f.name}`, 'warn'); continue; }
+      if (f.size > MAX_SIZE) { addLog(`Skipped — over 500MB: ${f.name} (${(f.size/1024/1024).toFixed(1)} MB)`, 'warn'); continue; }
+      if (files.find(x => x.name === f.name && x.size === f.size)) continue;
+      files.push(f);
+      renderQueueItem(f);
+      added++;
+    }
+    if (added) {
+      addLog(`${added} video(s) queued`, 'info');
+      btnProcess.disabled = false;
+      queueLabel.style.display = 'block';
+    }
+  }
+
+  function renderQueueItem(f) {
+    const id = CSS.escape(f.name + f.size);
+    const item = document.createElement('div');
+    item.className = 'queue-item';
+    item.id = `item-${id}`;
+
+    const thumb = document.createElement('div');
+    thumb.className = 'item-thumb';
+    const ext = (f.name.match(/\.([^.]+)$/) || [,'mp4'])[1].toUpperCase();
+    thumb.textContent = ext;
+
+    const info = document.createElement('div');
+    info.className = 'item-info';
+    info.innerHTML = `
+      <div class="item-name">${f.name}</div>
+      <div class="item-meta">${(f.size/1024/1024).toFixed(1)} MB · ${f.type || 'video'}</div>
+    `;
+
+    const status = document.createElement('span');
+    status.className = 'item-status status-waiting';
+    status.id = `status-${id}`;
+    status.textContent = 'queued';
+
+    const remove = document.createElement('button');
+    remove.className = 'item-remove';
+    remove.textContent = '×';
+    remove.onclick = () => {
+      item.remove();
+      const idx = files.findIndex(x => x.name===f.name && x.size===f.size);
+      if (idx > -1) files.splice(idx, 1);
+      if (!files.length) { btnProcess.disabled = true; queueLabel.style.display='none'; }
+    };
+
+    item.appendChild(thumb);
+    item.appendChild(info);
+    item.appendChild(status);
+    item.appendChild(remove);
+    queueEl.appendChild(item);
+  }
+
+  // ── ISO 6709 location formatter for Apple QuickTime metadata ──
+  function iso6709(lat, lng) {
+    const latStr = (lat >= 0 ? '+' : '-') + Math.abs(lat).toFixed(4).padStart(7, '0');
+    const lngStr = (lng >= 0 ? '+' : '-') + Math.abs(lng).toFixed(4).padStart(8, '0');
+    return latStr + lngStr + '/';
+  }
+
+  function isoDate() {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${now.getUTCFullYear()}-${pad(now.getUTCMonth()+1)}-${pad(now.getUTCDate())}T${pad(now.getUTCHours())}:${pad(now.getUTCMinutes())}:${pad(now.getUTCSeconds())}.000000Z`;
+  }
+
+  // ── Process one video with ffmpeg ─────────────────────
+  async function processVideo(f) {
+    const optStrip = document.getElementById('opt-strip').checked;
+    const optSpoof = document.getElementById('opt-spoof').checked;
+
+    const extMatch = f.name.match(/\.([^.]+)$/);
+    const ext = extMatch ? extMatch[1].toLowerCase() : 'mp4';
+
+    const inputName = `in.${ext}`;
+    const outputName = `out.${ext}`;
+
+    // Write file into ffmpeg's virtual FS
+    const { fetchFile } = FFmpegUtil;
+    const data = await fetchFile(f);
+    await ffmpeg.writeFile(inputName, data);
+
+    // Build ffmpeg command — stream copy only, no re-encode
+    const args = ['-i', inputName];
+
+    // Strip existing metadata first
+    if (optStrip) {
+      args.push('-map_metadata', '-1');
+    }
+
+    // Copy all streams (no re-encode)
+    args.push('-c', 'copy');
+
+    // Inject spoofed metadata
+    if (optSpoof) {
+      const camObj = getCamera();
+      const jitteredLat = spoofLocation.lat + (Math.random() - 0.5) * 0.024;
+      const jitteredLng = spoofLocation.lng + (Math.random() - 0.5) * 0.024;
+      const locStr = iso6709(jitteredLat, jitteredLng);
+      const dateStr = isoDate();
+
+      // Generic container metadata — works for MP4 and MOV
+      args.push('-metadata', `creation_time=${dateStr}`);
+      args.push('-metadata', `make=${camObj.make}`);
+      args.push('-metadata', `model=${camObj.model}`);
+      args.push('-metadata', `encoder=`);
+      args.push('-metadata', `location=${locStr}`);
+      args.push('-metadata', `location-eng=${locStr}`);
+
+      // Apple QuickTime metadata (MOV + iOS-recorded MP4)
+      args.push('-metadata', `com.apple.quicktime.make=${camObj.make}`);
+      args.push('-metadata', `com.apple.quicktime.model=${camObj.model}`);
+      args.push('-metadata', `com.apple.quicktime.software=17.3.1`);
+      args.push('-metadata', `com.apple.quicktime.creationdate=${dateStr}`);
+      args.push('-metadata', `com.apple.quicktime.location.ISO6709=${locStr}`);
+
+      addLog(`  Metadata → ${camObj.model} | GPS: ${jitteredLat.toFixed(4)}, ${jitteredLng.toFixed(4)}`, 'ok');
+    }
+
+    // Faststart moov atom → playable before full download
+    args.push('-movflags', '+faststart+use_metadata_tags');
+
+    args.push(outputName);
+
+    addLog(`  ffmpeg ${args.join(' ')}`, 'info');
+
+    await ffmpeg.exec(args);
+
+    const outData = await ffmpeg.readFile(outputName);
+
+    // Clean up VFS
+    try { await ffmpeg.deleteFile(inputName); } catch(_) {}
+    try { await ffmpeg.deleteFile(outputName); } catch(_) {}
+
+    const mime = ext === 'mov' ? 'video/quicktime' : 'video/mp4';
+    const blob = new Blob([outData.buffer], { type: mime });
+    const blobUrl = URL.createObjectURL(blob);
+
+    addLog(`  Stream-copy complete — ${(f.size/1024/1024).toFixed(1)} MB → ${(blob.size/1024/1024).toFixed(1)} MB`, 'info');
+
+    return { outName: f.name, blobUrl, size: blob.size };
+  }
+
+  // ── Process all ───────────────────────────────────────
+  btnProcess.addEventListener('click', async () => {
+    if (!files.length || !engineReady) return;
+    btnProcess.disabled = true;
+    btnClear.disabled = true;
+    progressWrap.style.display = 'block';
+
+    addLog(`Starting batch — ${files.length} video(s) — mode: STREAM COPY (lossless)`, 'info');
+
+    let done = 0;
+    for (const f of files) {
+      const id = CSS.escape(f.name + f.size);
+      const statusEl = document.getElementById(`status-${id}`);
+      const itemEl   = document.getElementById(`item-${id}`);
+
+      if (statusEl) { statusEl.className = 'item-status status-processing'; statusEl.textContent = 'processing'; }
+      addLog(`Processing: ${f.name}`, 'info');
+
+      try {
+        const result = await processVideo(f);
+        if (!result) throw new Error('No result');
+        results[f.name] = result;
+
+        if (statusEl) { statusEl.className = 'item-status status-done'; statusEl.textContent = 'clean'; }
+        if (itemEl) {
+          itemEl.classList.add('done');
+          const dl = document.createElement('a');
+          dl.className = 'item-dl';
+          dl.href = result.blobUrl;
+          dl.download = result.outName;
+          dl.textContent = 'save';
+          itemEl.insertBefore(dl, itemEl.lastChild);
+        }
+        addLog(`✓ ${f.name} → ${(result.size/1024/1024).toFixed(1)} MB`, 'ok');
+      } catch (err) {
+        if (statusEl) { statusEl.className = 'item-status status-error'; statusEl.textContent = 'error'; }
+        if (itemEl) itemEl.classList.add('error');
+        addLog(`✗ ${f.name} — ${err.message}`, 'err');
+        console.error(err);
+      }
+      done++;
+      progressFill.style.width = `${(done/files.length)*100}%`;
+    }
+
+    addLog(`Batch complete. ${done} video(s) processed.`, 'ok');
+    btnProcess.disabled = false;
+    btnClear.disabled  = false;
+    btnDlAll.disabled  = Object.keys(results).length === 0;
+    progressFill.style.width = '100%';
+    setTimeout(() => { progressWrap.style.display = 'none'; progressFill.style.width='0%'; }, 2000);
+  });
+
+  // ── Download all ──────────────────────────────────────
+  btnDlAll.addEventListener('click', async () => {
+    const entries = Object.values(results);
+    if (!entries.length) return;
+    addLog(`Packing ${entries.length} clean video(s) into ZIP`, 'info');
+    const zip = new JSZip();
+    for (const r of entries) {
+      const blob = await fetch(r.blobUrl).then(res => res.blob());
+      zip.file(r.outName, blob);
+    }
+    const zipBlob = await zip.generateAsync({type: 'blob'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(zipBlob);
+    a.download = 'ghost_video_' + Date.now() + '.zip';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    addLog(`ZIP ready`, 'ok');
+  });
+
+  // ── Clear ─────────────────────────────────────────────
+  btnClear.addEventListener('click', () => {
+    files.length = 0;
+    Object.keys(results).forEach(k => delete results[k]);
+    queueEl.innerHTML = '';
+    btnProcess.disabled = true;
+    btnDlAll.disabled = true;
+    queueLabel.style.display = 'none';
+    addLog('Queue cleared', 'info');
+  });
+</script>
+</body>
+</html>

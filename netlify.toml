@@ -1,0 +1,14 @@
+# Ghost Protocol — Netlify config
+# Headers enable SharedArrayBuffer so ffmpeg.wasm can use the multi-threaded
+# core for faster video processing. Single-threaded core works without these,
+# so the app is safe either way.
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
+    Cross-Origin-Resource-Policy = "cross-origin"
+
+[build]
+  publish = "."

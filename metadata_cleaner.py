@@ -21,6 +21,7 @@ import argparse
 import io
 import os
 import struct
+import subprocess
 import sys
 import json
 import hashlib
@@ -431,7 +432,7 @@ class MetadataCleaner:
         ).replace(hour=hour, minute=minute, second=random.randint(0, 59))
 
     def clean_and_spoof(self, output_path: str) -> str:
-        """Main pipeline: strip → rebuild → spoof → save."""
+        """Main pipeline: strip → rebuild → spoof → save → strip macOS xattrs."""
         img = Image.open(self.filepath)
 
         # Step 1: Create a completely clean pixel copy
@@ -449,7 +450,38 @@ class MetadataCleaner:
         else:
             clean_img.save(output_path)
 
+        # Step 3: Strip macOS extended attributes (quarantine, download origin)
+        # These are filesystem-level attrs that reveal the file was downloaded,
+        # completely separate from EXIF/XMP image metadata
+        self._strip_macos_xattrs(output_path)
+
         return output_path
+
+    @staticmethod
+    def _strip_macos_xattrs(filepath: str):
+        """Remove macOS extended attributes that mark a file as downloaded.
+
+        Strips com.apple.quarantine (download flag) and
+        com.apple.metadata:kMDItemWhereFroms (source URL) so Finder
+        won't show 'Where from:' or 'Downloaded from' info.
+        """
+        if sys.platform != "darwin":
+            return
+
+        xattrs_to_remove = [
+            "com.apple.quarantine",
+            "com.apple.metadata:kMDItemWhereFroms",
+            "com.apple.metadata:kMDItemDownloadedDate",
+            "com.apple.lastuseddate#PS",
+        ]
+        for attr in xattrs_to_remove:
+            try:
+                subprocess.run(
+                    ["xattr", "-d", attr, filepath],
+                    capture_output=True,
+                )
+            except Exception:
+                pass
 
     def _strip_all(self, img: Image.Image) -> Image.Image:
         """
