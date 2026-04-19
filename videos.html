@@ -579,8 +579,8 @@
 </div>
 
 <!-- ffmpeg.wasm (single-threaded core — no SharedArrayBuffer needed) -->
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd/ffmpeg.js"></script>
-<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
+<script src="vendor/ffmpeg/ffmpeg.js"></script>
+<script src="vendor/ffmpeg/util.js"></script>
 
 <script>
   // ── State ──────────────────────────────────────────────
@@ -628,12 +628,10 @@
         console.log('[ffmpeg]', message);
       });
 
-      const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd';
-      const ffmpegBaseURL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.15/dist/umd';
       await ffmpeg.load({
-        classWorkerURL: await toBlobURL(`${ffmpegBaseURL}/814.ffmpeg.js`, 'text/javascript'),
-        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
-        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+        classWorkerURL: 'vendor/ffmpeg/814.ffmpeg.js',
+        coreURL: 'vendor/ffmpeg/ffmpeg-core.js',
+        wasmURL: 'vendor/ffmpeg/ffmpeg-core.wasm',
       });
 
       engineReady = true;
