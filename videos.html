@@ -628,10 +628,10 @@
         console.log('[ffmpeg]', message);
       });
 
+      const abs = (p) => new URL(p, location.href).href;
       await ffmpeg.load({
-        classWorkerURL: 'vendor/ffmpeg/814.ffmpeg.js',
-        coreURL: 'vendor/ffmpeg/ffmpeg-core.js',
-        wasmURL: 'vendor/ffmpeg/ffmpeg-core.wasm',
+        coreURL: abs('vendor/ffmpeg/ffmpeg-core.js'),
+        wasmURL: abs('vendor/ffmpeg/ffmpeg-core.wasm'),
       });
 
       engineReady = true;
